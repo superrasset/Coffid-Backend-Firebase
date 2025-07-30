@@ -9,12 +9,15 @@ const generateQrCode = require('./src/qr/generateQrCode');
 const getProcessStatus = require('./src/status/getProcessStatus');
 const createUserProfile = require('./src/auth/createUserProfile');
 const healthCheck = require('./src/utils/healthCheck');
+const { processPassportVerification } = require('./src/documentCheck/verifyPassportDocument');
+const { processUploadedDocument } = require('./src/documentCheck/documentProcessor');
 
 // Export all functions
 exports.generateQrCode = generateQrCode;
 exports.getProcessStatus = getProcessStatus;
 exports.createUserProfile = createUserProfile;
 exports.healthCheck = healthCheck;
+exports.processUploadedDocument = processUploadedDocument;
 
 // -----------------------------------------------------------------------------------------------------------
 // ---------------------------------------------API ENDPOINTS-------------------------------------------------
