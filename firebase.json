@@ -1,0 +1,53 @@
+{
+  "firestore": {
+    "database": "(default)",
+    "location": "eur3",
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "functions": [
+    {
+      "source": "functions",
+      "codebase": "default",
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        "*.local"
+      ]
+    }
+  ],
+  "emulators": {
+    "firestore": {
+      "port": "8088"
+    },
+    "functions": {
+      "port": "5001"
+    },
+    "auth": {
+      "port": "9099"
+    },
+    "ui": {
+      "port": "4000"
+    }
+  },
+  "hosting": {
+    "public": "public",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+      "source": "/api/identity-check",
+      "function": "generateQrCode" 
+      },
+      {
+      "source": "/api/check-status",
+      "function": "getProcessStatus" 
+      }
+    ]
+  }
+}
