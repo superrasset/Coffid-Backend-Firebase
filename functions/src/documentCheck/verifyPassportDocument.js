@@ -117,27 +117,27 @@ async function createVerifiedPassportDocument(userId, verificationResult, db) {
   try {
     logInfo(`Creating verified passport document for user ${userId}`);
 
-    const verifiedDocRef = db.collection('verifiedDocument').doc(userId);
+    const verifiedDocRef = db.collection('verifiedDocument').doc();
     
-    // Check if document already exists
-    const existingDoc = await verifiedDocRef.get();
+    // Determine status based on verification result
+    const status = verificationResult.isValid ? 'completed' : 'rejected';
     
-    if (existingDoc.exists) {
-      // Update existing document with passport data
-      await verifiedDocRef.update({
+    // Create new document with passport data and top-level status
+    await verifiedDocRef.set({
+      userId,
+      documentType: 'Passport',
+      status: status, // Top-level status field
+      uploadedDocuments: {
         passport: verificationResult,
-        updatedAt: new Date()
-      });
-      logInfo(`Updated verified document with passport data for user ${userId}`);
-    } else {
-      // Create new document with passport data
-      await verifiedDocRef.set({
-        userId,
-        passport: verificationResult,
-        createdAt: new Date()
-      });
-      logInfo(`Created new verified document with passport data for user ${userId}`);
-    }
+        processedAt: new Date(),
+        overallValid: verificationResult.isValid
+      },
+      createdAt: new Date()
+    });
+    logInfo(`Created new verified document with auto-generated ID ${verifiedDocRef.id} for passport - user ${userId}`, {
+      status: status,
+      isValid: verificationResult.isValid
+    });
 
   } catch (error) {
     logError(`Error creating verified passport document for user ${userId}:`, {

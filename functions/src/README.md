@@ -100,6 +100,36 @@ exports.validateUser = validateUser;
 - Ensures consistency between manual and automatic processing
 - Single source of truth for each document type's verification algorithms
 
+## OCR Service Architecture (NEW)
+
+The backend now includes a modular OCR service architecture designed for easy migration from temporary solutions to custom implementations.
+
+### Key Features:
+- **Provider Abstraction**: Easy switching between OCR providers
+- **Future-Proof Design**: Ready for migration to custom OCR
+- **Consistent Interface**: All providers return standardized results
+- **Configuration-Based**: Switch providers via environment variables
+
+### Available OCR Providers:
+1. **Mock Service** (`mock`) - Development/testing without API calls
+2. **Mindee Service** (`mindee`) - Temporary production solution
+3. **Custom Service** (`custom`) - Future custom OCR implementation
+
+### Configuration:
+```bash
+# Set OCR provider
+export OCR_PROVIDER=mock          # For development
+export OCR_PROVIDER=mindee        # For production (temporary)
+export OCR_PROVIDER=custom        # For custom solution (future)
+```
+
+### Migration Path:
+1. **Current**: Development with mock OCR service
+2. **Short-term**: Production with Mindee API integration
+3. **Long-term**: Replace with custom OCR solution
+
+See `src/documentCheck/OCR_README.md` for detailed architecture documentation.
+
 ## Testing
 
 Run the functions locally:
