@@ -2,30 +2,50 @@
 // This demonstrates how documents should be structured for the new system
 
 const testDocuments = {
-  // Example 1: ID Document - Recto Side Upload
-  idDocumentRecto: {
+  // Example 1: Traditional ID Document - Recto Side Upload
+  traditionalIdRecto: {
     userId: "user123",
-    documentType: "id",
+    documentType: "Traditional ID", // Exact string that routes to verifyIDDocument.js
     side: "recto",
-    imageUrl: "https://storage.googleapis.com/bucket/id_recto_image.jpg",
+    imageUrl: "https://storage.googleapis.com/bucket/traditional_id_recto.jpg",
     status: "pending",
     uploadedAt: new Date()
   },
 
-  // Example 2: ID Document - Verso Side Upload (separate document)
-  idDocumentVerso: {
+  // Example 2: Traditional ID Document - Verso Side Upload (separate document)
+  traditionalIdVerso: {
     userId: "user123", // Same user as recto
-    documentType: "id",
+    documentType: "Traditional ID", // Exact string that routes to verifyIDDocument.js
     side: "verso", 
-    imageUrl: "https://storage.googleapis.com/bucket/id_verso_image.jpg",
+    imageUrl: "https://storage.googleapis.com/bucket/traditional_id_verso.jpg",
     status: "pending",
     uploadedAt: new Date()
   },
 
-  // Example 3: Passport Document
-  passportDocument: {
+  // Example 3: New ID Document - Recto Side Upload
+  newIdRecto: {
     userId: "user456",
-    documentType: "passport",
+    documentType: "New ID", // Exact string that routes to verifyIDDocument.js
+    side: "recto",
+    imageUrl: "https://storage.googleapis.com/bucket/new_id_recto.jpg",
+    status: "pending",
+    uploadedAt: new Date()
+  },
+
+  // Example 4: New ID Document - Verso Side Upload
+  newIdVerso: {
+    userId: "user456",
+    documentType: "New ID", // Exact string that routes to verifyIDDocument.js
+    side: "verso",
+    imageUrl: "https://storage.googleapis.com/bucket/new_id_verso.jpg",
+    status: "pending",
+    uploadedAt: new Date()
+  },
+
+  // Example 5: Passport Document
+  passportDocument: {
+    userId: "user789",
+    documentType: "Passport", // Exact string that routes to verifyPassportDocument.js
     // No 'side' field for passport
     imageUrl: "https://storage.googleapis.com/bucket/passport_image.jpg",
     status: "pending",
@@ -91,37 +111,32 @@ const expectedResults = {
 
 // Workflow Steps:
 console.log(`
-NEW DOCUMENT VERIFICATION WORKFLOW TEST SCENARIO
-===============================================
+NEW DOCUMENT VERIFICATION WORKFLOW - REFACTORED ARCHITECTURE
+============================================================
 
-1. Upload ID Recto Side:
-   - Create document in uploadedDocument with 'side: recto'
-   - Trigger fires: processUploadedDocument
-   - Verification runs: processDocumentVerification(imageUrl, 'recto')
-   - Document updated with verification result
-   
-2. Upload ID Verso Side:
-   - Create document in uploadedDocument with 'side: verso'  
-   - Trigger fires: processUploadedDocument
-   - Verification runs: processDocumentVerification(imageUrl, 'verso')
-   - Document updated with verification result
-   
-3. Aggregation:
-   - checkAndAggregateIDResults runs after each verification
-   - When both sides complete, creates entry in verifiedDocument
-   - Sets overallValid = recto.isValid && verso.isValid
+ROUTING LOGIC (documentProcessor.js):
+- Routes ONLY based on documentType field
+- "Traditional ID" → verifyIDDocument.js  
+- "New ID" → verifyIDDocument.js
+- "Passport" → verifyPassportDocument.js
 
-For Passport:
-   - Single document upload
-   - Immediate verification 
-   - Direct entry to verifiedDocument
+ID DOCUMENT PROCESSING (verifyIDDocument.js):
+1. Handles both Traditional ID and New ID types
+2. Validates side ('recto' or 'verso') internally
+3. Performs verification based on documentType + side combination
+4. Creates/updates verifiedDocument with recto, then completes with verso
 
-Benefits:
-✅ No update triggers (eliminates complexity)
-✅ Atomic operations per document side
-✅ Clear audit trail
-✅ Easy debugging
-✅ Scalable architecture
+PASSPORT PROCESSING (verifyPassportDocument.js):
+1. Handles Passport documentType
+2. No side validation needed (single document)
+3. Direct verification and verifiedDocument creation
+
+BENEFITS:
+✅ Clean separation of concerns
+✅ documentProcessor.js only routes by documentType
+✅ All business logic contained in dedicated files
+✅ Easy to extend with new document types
+✅ Side handling encapsulated in ID verification logic
 `);
 
 module.exports = {
