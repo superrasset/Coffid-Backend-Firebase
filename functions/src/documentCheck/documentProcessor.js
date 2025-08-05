@@ -54,9 +54,6 @@ const processUploadedDocument = onDocumentCreated("uploadedDocument/{docId}", as
         documentType: normalizedType
       });
       
-      // Import and call video processing function
-      const { completeDocumentWithVideo } = require('./verifyIDDocument');
-      
       try {
         // For face recordings, assume video validation is successful
         // In a real implementation, you would process the video here
@@ -73,17 +70,38 @@ const processUploadedDocument = onDocumentCreated("uploadedDocument/{docId}", as
           filename: newData.filename
         };
         
-        const result = await completeDocumentWithVideo(newData.userId, normalizedType, videoValidationResult, videoData);
-        logInfo(`Video validation completed for user ${newData.userId}`, {
-          success: result.success,
-          finalStatus: result.finalStatus,
-          documentId: result.documentId,
-          videoDataStored: {
-            hasFaceRecordingUrl: !!videoData.faceRecordingUrl,
-            hasVideoUrl: !!videoData.videoUrl,
-            filename: videoData.filename
-          }
-        });
+        // Route to appropriate video completion function based on document type
+        if (normalizedType === 'Passport') {
+          // Import and call passport video processing function
+          const { completePassportWithVideo } = require('./verifyPassportDocument');
+          
+          const result = await completePassportWithVideo(newData.userId, normalizedType, videoValidationResult, videoData);
+          logInfo(`Passport video validation completed for user ${newData.userId}`, {
+            success: result.success,
+            finalStatus: result.finalStatus,
+            documentId: result.documentId,
+            videoDataStored: {
+              hasFaceRecordingUrl: !!videoData.faceRecordingUrl,
+              hasVideoUrl: !!videoData.videoUrl,
+              filename: videoData.filename
+            }
+          });
+        } else {
+          // Import and call ID document video processing function
+          const { completeDocumentWithVideo } = require('./verifyIDDocument');
+          
+          const result = await completeDocumentWithVideo(newData.userId, normalizedType, videoValidationResult, videoData);
+          logInfo(`ID document video validation completed for user ${newData.userId}`, {
+            success: result.success,
+            finalStatus: result.finalStatus,
+            documentId: result.documentId,
+            videoDataStored: {
+              hasFaceRecordingUrl: !!videoData.faceRecordingUrl,
+              hasVideoUrl: !!videoData.videoUrl,
+              filename: videoData.filename
+            }
+          });
+        }
         
       } catch (videoError) {
         logError(`Error processing video validation for user ${newData.userId}:`, {

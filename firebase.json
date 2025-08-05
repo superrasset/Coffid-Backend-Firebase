@@ -41,12 +41,28 @@
     ],
     "rewrites": [
       {
-      "source": "/api/identity-check",
-      "function": "generateQrCode" 
+        "source": "/en",
+        "destination": "/en.html"
       },
       {
-      "source": "/api/check-status",
-      "function": "getProcessStatus" 
+        "source": "/cgu",
+        "destination": "/cgu.html"
+      },
+      {
+        "source": "/privacy",
+        "destination": "/privacy.html"
+      },
+      {
+        "source": "/support",
+        "destination": "/support.html"
+      },
+      {
+        "source": "/api/identity-check",
+        "function": "generateQrCode" 
+      },
+      {
+        "source": "/api/check-status",
+        "function": "getProcessStatus" 
       }
     ]
   }

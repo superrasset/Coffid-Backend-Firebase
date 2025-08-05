@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Coffid - Support</title>
+    <link rel="stylesheet" href="/styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        .support-content {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 120px 20px 80px;
+        }
+        .support-content h1 {
+            color: #1e293b;
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+        .support-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin: 3rem 0;
+        }
+        .support-card {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            text-align: center;
+        }
+        .support-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+        .support-card h3 {
+            color: #1e293b;
+            margin-bottom: 1rem;
+        }
+        .support-card p {
+            color: #64748b;
+            margin-bottom: 1.5rem;
+        }
+        .support-btn {
+            background: #2563eb;
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 6px;
+            text-decoration: none;
+            font-weight: 500;
+            transition: background 0.3s ease;
+        }
+        .support-btn:hover {
+            background: #1d4ed8;
+        }
+        .back-link {
+            display: inline-block;
+            margin-bottom: 2rem;
+            color: #2563eb;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        .back-link:hover {
+            text-decoration: underline;
+        }
+        .faq-section {
+            margin: 3rem 0;
+        }
+        .faq-item {
+            margin-bottom: 2rem;
+            padding: 1.5rem;
+            background: #f8fafc;
+            border-radius: 8px;
+        }
+        .faq-question {
+            font-weight: 600;
+            color: #1e293b;
+            margin-bottom: 0.5rem;
+        }
+        .faq-answer {
+            color: #64748b;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <nav class="navbar">
+            <div class="nav-container">
+                <div class="nav-logo">
+                    <h1>Coffid</h1>
+                </div>
+                <div class="nav-menu">
+                    <a href="/" class="nav-link">Accueil</a>
+                    <a href="/cgu" class="nav-link">CGU</a>
+                    <a href="/privacy" class="nav-link">Confidentialité</a>
+                </div>
+            </div>
+        </nav>
+    </header>
+
+    <main>
+        <div class="support-content">
+            <a href="/" class="back-link">← Retour à l'accueil</a>
+            
+            <h1>Support & Aide</h1>
+
+            <div class="support-grid">
+                <div class="support-card">
+                    <div class="support-icon">📧</div>
+                    <h3>Contact Email</h3>
+                    <p>Envoyez-nous vos questions par email</p>
+                    <a href="mailto:support@coffid.com" class="support-btn">support@coffid.com</a>
+                </div>
+                
+                <div class="support-card">
+                    <div class="support-icon">💬</div>
+                    <h3>Chat en Direct</h3>
+                    <p>Parlez avec notre équipe support</p>
+                    <a href="#" class="support-btn">Bientôt disponible</a>
+                </div>
+                
+                <div class="support-card">
+                    <div class="support-icon">📖</div>
+                    <h3>Documentation</h3>
+                    <p>Consultez notre guide d'utilisation</p>
+                    <a href="#" class="support-btn">Bientôt disponible</a>
+                </div>
+            </div>
+
+            <div class="faq-section">
+                <h2 style="text-align: center; color: #1e293b; margin-bottom: 2rem;">Questions Fréquentes</h2>
+                
+                <div class="faq-item">
+                    <div class="faq-question">Comment fonctionne la vérification d'identité ?</div>
+                    <div class="faq-answer">
+                        Coffid utilise une technologie OCR avancée pour extraire les informations de vos documents 
+                        d'identité, puis compare votre visage avec la photo du document grâce à la reconnaissance faciale.
+                    </div>
+                </div>
+
+                <div class="faq-item">
+                    <div class="faq-question">Mes données sont-elles sécurisées ?</div>
+                    <div class="faq-answer">
+                        Oui, toutes vos données sont chiffrées de bout en bout et stockées sur des serveurs sécurisés. 
+                        Nous respectons strictement le RGPD et vous gardez le contrôle total sur vos informations.
+                    </div>
+                </div>
+
+                <div class="faq-item">
+                    <div class="faq-question">Quels documents puis-je utiliser ?</div>
+                    <div class="faq-answer">
+                        Coffid accepte les cartes d'identité nationales, les passeports et autres documents 
+                        officiels émis par les autorités gouvernementales.
+                    </div>
+                </div>
+
+                <div class="faq-item">
+                    <div class="faq-question">Comment partager mes informations ?</div>
+                    <div class="faq-answer">
+                        Vous pouvez générer des QR codes sécurisés qui contiennent uniquement les informations 
+                        que vous choisissez de partager. Le destinataire ne voit que ce que vous autorisez.
+                    </div>
+                </div>
+
+                <div class="faq-item">
+                    <div class="faq-question">Puis-je supprimer mes données ?</div>
+                    <div class="faq-answer">
+                        Oui, vous pouvez supprimer votre compte et toutes vos données à tout moment depuis 
+                        l'application. La suppression est définitive et irréversible.
+                    </div>
+                </div>
+
+                <div class="faq-item">
+                    <div class="faq-question">L'application est-elle gratuite ?</div>
+                    <div class="faq-answer">
+                        Coffid propose une version gratuite avec les fonctionnalités de base. Des fonctionnalités 
+                        premium seront disponibles via un abonnement optionnel.
+                    </div>
+                </div>
+            </div>
+
+            <div style="text-align: center; margin: 3rem 0; padding: 2rem; background: #f8fafc; border-radius: 12px;">
+                <h3 style="color: #1e293b; margin-bottom: 1rem;">Vous ne trouvez pas votre réponse ?</h3>
+                <p style="color: #64748b; margin-bottom: 1.5rem;">
+                    Notre équipe support est là pour vous aider
+                </p>
+                <a href="mailto:support@coffid.com" class="support-btn">Contactez-nous</a>
+            </div>
+        </div>
+    </main>
+
+    <footer>
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h3>Coffid</h3>
+                    <p>Vérification d'identité moderne et sécurisée</p>
+                </div>
+                <div class="footer-section">
+                    <h4>Liens utiles</h4>
+                    <ul>
+                        <li><a href="/cgu">Conditions d'utilisation</a></li>
+                        <li><a href="/privacy">Politique de confidentialité</a></li>
+                        <li><a href="/support">Support</a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h4>Contact</h4>
+                    <p>support@coffid.com</p>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2025 Coffid. Tous droits réservés.</p>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>

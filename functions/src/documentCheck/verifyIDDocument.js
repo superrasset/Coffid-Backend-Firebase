@@ -38,28 +38,37 @@ async function processIDDocument(docId, documentData) {
 
     // 2. Update the uploaded document with basic status
     const db = getFirestore();
-    await db.collection('uploadedDocument').doc(docId).update({
+    const uploadedDocUpdate = {
       verifiedAt: new Date(),
       status: verificationResult.isValid ? 'verified' : 'rejected'
+    };
+
+    // Add validity field to indicate the validation result for the app
+    if (verificationResult.isValid) {
+      uploadedDocUpdate.validity = 'validated';
+      uploadedDocUpdate.validatedAt = new Date();
+    } else {
+      uploadedDocUpdate.validity = 'rejected';
+      uploadedDocUpdate.rejectedAt = new Date();
+    }
+
+    await db.collection('uploadedDocument').doc(docId).update(uploadedDocUpdate);
+
+    logInfo(`Updated uploadedDocument ${docId} with validation result`, {
+      status: uploadedDocUpdate.status,
+      validity: uploadedDocUpdate.validity,
+      isValid: verificationResult.isValid
     });
 
     // 3. Create or update the verified document
     const verificationStatus = await updateVerifiedDocumentForID(userId, side, verificationResult, db, docId, documentType);
-
-    // 4. Update uploadedDocument validity if this individual document is valid
-    if (verificationResult.isValid) {
-      await db.collection('uploadedDocument').doc(docId).update({
-        validity: 'validated',
-        validatedAt: new Date()
-      });
-      logInfo(`Updated uploadedDocument ${docId} validity to 'validated'`);
-    }
 
     logInfo(`ID document processing completed for user ${userId}`, {
       documentType,
       side,
       isValid: verificationResult.isValid,
       uploadedDocumentId: docId,
+      validity: verificationResult.isValid ? 'validated' : 'rejected',
       isComplete: verificationStatus?.isComplete,
       overallValid: verificationStatus?.overallValid
     });

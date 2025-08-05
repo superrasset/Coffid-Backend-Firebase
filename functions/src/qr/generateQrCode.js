@@ -11,12 +11,30 @@ const qrcode = require('qrcode');
  */
 const generateQrCode = onRequest(async (req, res) => {
     // Get the info the client wants to access
-    const infoRequired = req.query.q;
+    const queryParam = req.query.q;
     
-    if (!infoRequired) {
+    if (!queryParam) {
         // If no text is provided, return a 400 Bad Request error
         return res.status(400).send('Please provide the data you want to check in the query parameter.');
     }
+
+    // Parse multiple infoRequired parameters
+    // Support ampersand-separated values for multiple items
+    // Example: q=majority&firstname
+    let infoRequired;
+    if (queryParam.includes('&')) {
+        // Handle ampersand-separated values (majority&firstname)
+        infoRequired = queryParam.split('&').map(item => item.trim()).filter(item => item.length > 0);
+    } else {
+        // Single value
+        infoRequired = [queryParam.trim()];
+    }
+
+    if (infoRequired.length === 0) {
+        return res.status(400).send('Please provide valid data to check in the query parameter.');
+    }
+
+    console.log('Parsed infoRequired:', infoRequired);
 
     try {
         const pendingRequest = await getFirestore()
@@ -26,7 +44,7 @@ const generateQrCode = onRequest(async (req, res) => {
         
         .add({
           clientRequester : 'Pornhub',  
-          infoRequired: infoRequired,
+          infoRequired: infoRequired, // Now stores an array of required information
           status : 'pending',
           createdAt : new Date(),
           result: null,
@@ -59,7 +77,8 @@ const generateQrCode = onRequest(async (req, res) => {
         if (contentType === 'application/json') {
             res.status(200).json({ 
               dataToEncode: qrOutput,
-              taskId: pendingRequest.id 
+              taskId: pendingRequest.id,
+              infoRequired: infoRequired // Include the parsed array of requirements
             });
         } else {
             res.setHeader('Content-Type', contentType);
