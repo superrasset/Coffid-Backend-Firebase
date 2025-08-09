@@ -39,7 +39,38 @@
       "**/.*",
       "**/node_modules/**"
     ],
+    "headers": [
+      {
+        "source": "/.well-known/apple-app-site-association",
+        "headers": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Cache-Control",
+            "value": "max-age=3600"
+          }
+        ]
+      }
+    ],
     "rewrites": [
+      {
+        "source": "/second/**",
+        "destination": "/app.html"
+      },
+      {
+        "source": "/app",
+        "destination": "/app.html"
+      },
+      {
+        "source": "/app-en",
+        "destination": "/app-en.html"
+      },
+      {
+        "source": "/test-links",
+        "destination": "/test-links.html"
+      },
       {
         "source": "/en",
         "destination": "/en.html"

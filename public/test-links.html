@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Coffid - Test Universal Links</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .test-container {
+            max-width: 600px;
+            margin: 2rem auto;
+            padding: 2rem;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+        
+        .test-section {
+            margin-bottom: 2rem;
+            padding: 1.5rem;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+        }
+        
+        .test-button {
+            display: inline-block;
+            margin: 0.5rem;
+            padding: 0.75rem 1.5rem;
+            background: #667eea;
+            color: white;
+            text-decoration: none;
+            border-radius: 6px;
+            border: none;
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+        
+        .test-button:hover {
+            background: #5a6fd8;
+        }
+        
+        .test-output {
+            margin-top: 1rem;
+            padding: 1rem;
+            background: #f5f5f5;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 0.8rem;
+            white-space: pre-wrap;
+        }
+        
+        .qr-container {
+            text-align: center;
+            margin: 1rem 0;
+        }
+        
+        #qrcode {
+            margin: 1rem auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>Coffid Universal Links - Test</h1>
+        <p>Cette page permet de tester les Universal Links et les fonctionnalités de fallback.</p>
+        
+        <div class="test-section">
+            <h3>🔗 Génération de liens</h3>
+            <button class="test-button" onclick="generateVerificationLink()">
+                Générer lien de vérification
+            </button>
+            <button class="test-button" onclick="generateDocumentLink()">
+                Générer lien de document
+            </button>
+            <div class="test-output" id="linkOutput">Les liens générés apparaîtront ici...</div>
+        </div>
+        
+        <div class="test-section">
+            <h3>📱 Test d'ouverture d'app</h3>
+            <button class="test-button" onclick="testAppOpening()">
+                Tester ouverture app (vérification)
+            </button>
+            <button class="test-button" onclick="testDirectFallback()">
+                Aller vers fallback directement
+            </button>
+            <div class="test-output" id="appOutput">Résultats du test d'ouverture...</div>
+        </div>
+        
+        <div class="test-section">
+            <h3>📊 QR Code</h3>
+            <button class="test-button" onclick="generateQRCode()">
+                Générer QR Code de test
+            </button>
+            <div class="qr-container">
+                <div id="qrcode"></div>
+            </div>
+            <div class="test-output" id="qrOutput">QR Code généré apparaîtra ci-dessus...</div>
+        </div>
+        
+        <div class="test-section">
+            <h3>ℹ️ Informations du navigateur</h3>
+            <div class="test-output" id="browserInfo"></div>
+        </div>
+        
+        <div class="test-section">
+            <h3>🔗 Liens directs de test</h3>
+            <a href="/app?path=verify&session=test123" class="test-button">
+                Test FR Fallback
+            </a>
+            <a href="/app-en?path=verify&session=test123" class="test-button">
+                Test EN Fallback
+            </a>
+            <a href="coffid://verify?session=test123" class="test-button">
+                Test Direct Deep Link
+            </a>
+        </div>
+    </div>
+
+    <!-- Include QR Code library -->
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+    <!-- Include Universal Link utility -->
+    <script src="/js/universal-link.js"></script>
+    
+    <script>
+        const linkGenerator = new CoffidUniversalLink();
+        
+        // Display browser info
+        function updateBrowserInfo() {
+            const userAgent = navigator.userAgent || navigator.vendor || window.opera;
+            const isIOS = /iPad|iPhone|iPod/.test(userAgent) && !window.MSStream;
+            const isAndroid = /android/i.test(userAgent);
+            const isMobile = isIOS || isAndroid;
+            
+            const info = {
+                'User Agent': userAgent,
+                'Is iOS': isIOS,
+                'Is Android': isAndroid,
+                'Is Mobile': isMobile,
+                'URL': window.location.href,
+                'Base URL': linkGenerator.baseURL
+            };
+            
+            document.getElementById('browserInfo').textContent = 
+                Object.entries(info).map(([key, value]) => `${key}: ${value}`).join('\n');
+        }
+        
+        function generateVerificationLink() {
+            const sessionId = 'session_' + Math.random().toString(36).substr(2, 9);
+            const frLink = linkGenerator.generateVerificationLink(sessionId, 'fr');
+            const enLink = linkGenerator.generateVerificationLink(sessionId, 'en');
+            
+            document.getElementById('linkOutput').textContent = 
+                `Session ID: ${sessionId}\n\n` +
+                `FR Link: ${frLink}\n\n` +
+                `EN Link: ${enLink}`;
+        }
+        
+        function generateDocumentLink() {
+            const docId = 'doc_' + Math.random().toString(36).substr(2, 9);
+            const frLink = linkGenerator.generateDocumentLink(docId, 'fr');
+            const enLink = linkGenerator.generateDocumentLink(docId, 'en');
+            
+            document.getElementById('linkOutput').textContent = 
+                `Document ID: ${docId}\n\n` +
+                `FR Link: ${frLink}\n\n` +
+                `EN Link: ${enLink}`;
+        }
+        
+        function testAppOpening() {
+            const sessionId = 'test_session_' + Date.now();
+            const testLink = linkGenerator.generateVerificationLink(sessionId, 'fr');
+            
+            document.getElementById('appOutput').textContent = 
+                `Test en cours...\nTentative d'ouverture: ${testLink}\n\n`;
+            
+            CoffidUniversalLink.openApp(testLink, {
+                onAppOpened: () => {
+                    document.getElementById('appOutput').textContent += 
+                        'SUCCESS: App ouverte avec succès!\n';
+                },
+                onFallback: () => {
+                    document.getElementById('appOutput').textContent += 
+                        'FALLBACK: App non installée, redirection vers fallback...\n';
+                }
+            });
+        }
+        
+        function testDirectFallback() {
+            const testLink = linkGenerator.generateVerificationLink('direct_test', 'fr');
+            window.location.href = testLink;
+        }
+        
+        function generateQRCode() {
+            const sessionId = 'qr_test_' + Date.now();
+            const qrLink = linkGenerator.generateVerificationLink(sessionId, 'fr');
+            
+            // Clear previous QR code
+            document.getElementById('qrcode').innerHTML = '';
+            
+            // Generate new QR code
+            QRCode.toCanvas(document.getElementById('qrcode'), qrLink, {
+                width: 200,
+                margin: 2,
+                color: {
+                    dark: '#000000',
+                    light: '#FFFFFF'
+                }
+            }, function (error) {
+                if (error) {
+                    document.getElementById('qrOutput').textContent = 
+                        'Erreur génération QR: ' + error;
+                } else {
+                    document.getElementById('qrOutput').textContent = 
+                        `QR Code généré pour:\n${qrLink}\n\n` +
+                        `Session: ${sessionId}\n\n` +
+                        'Scannez avec votre téléphone pour tester!';
+                }
+            });
+        }
+        
+        // Initialize
+        updateBrowserInfo();
+    </script>
+</body>
+</html>
