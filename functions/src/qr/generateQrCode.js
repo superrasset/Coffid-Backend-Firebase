@@ -61,7 +61,7 @@ const generateQrCode = onRequest(async (req, res) => {
         // TODO: Add switch case to validate input (majorité/age/genre/...)
         
         .add({
-          clientRequester : 'Pornhub',  
+          clientRequester : 'Demo Platform',  
           infoRequired: infoRequired, // Now stores an array of required information
           status : 'pending',
           createdAt : new Date(),
