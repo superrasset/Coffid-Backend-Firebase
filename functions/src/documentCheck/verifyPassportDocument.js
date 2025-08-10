@@ -1,6 +1,6 @@
 const {getFirestore} = require("firebase-admin/firestore");
 const {info: logInfo, error: logError} = require("firebase-functions/logger");
-const { createOCRService } = require('./ocrService');
+const { createOCRService } = require('./ocrServiceV2');
 
 /**
  * Process passport document verification workflow
@@ -195,6 +195,71 @@ async function createVerifiedPassportDocument(userId, verificationResult, db) {
 }
 
 /**
+ * Get passport number length based on nationality
+ * @param {string} nationality - The nationality from the passport
+ * @returns {number} - Number of characters to extract from passport number
+ */
+function getPassportNumberLength(nationality) {
+  if (!nationality) return 9; // Default length
+  
+  const nationalityLower = nationality.toLowerCase();
+  
+  // Mapping of nationalities to passport number lengths
+  const lengthMapping = {
+    'française': 9,
+    'francaise': 9,
+    'french': 9,
+    'france': 9,
+    'belge': 8,
+    'belgian': 8,
+    'belgium': 8,
+    'belgique': 8,
+    'suisse': 8,
+    'swiss': 8,
+    'switzerland': 8,
+    'allemande': 9,
+    'german': 9,
+    'germany': 9,
+    'allemagne': 9,
+    'italienne': 9,
+    'italian': 9,
+    'italy': 9,
+    'italie': 9,
+    'espagnole': 9,
+    'spanish': 9,
+    'spain': 9,
+    'espagne': 9,
+    'britannique': 9,
+    'british': 9,
+    'royaume-uni': 9,
+    'united kingdom': 9,
+    'uk': 9,
+    'américaine': 9,
+    'american': 9,
+    'etats-unis': 9,
+    'united states': 9,
+    'usa': 9,
+    'canadienne': 8,
+    'canadian': 8,
+    'canada': 8,
+    'australienne': 8,
+    'australian': 8,
+    'australia': 8,
+    'australie': 8,
+    'chinoise': 9,
+    'chinese': 9,
+    'china': 9,
+    'chine': 9,
+    'japonaise': 9,
+    'japanese': 9,
+    'japan': 9,
+    'japon': 9
+  };
+  
+  return lengthMapping[nationalityLower] || 9; // Default to 9 if nationality not found
+}
+
+/**
  * Extract document-level fields from passport data
  * Similar to ID document extraction
  */
@@ -203,7 +268,18 @@ function extractDocumentLevelFields(extractedData) {
   
   // Map passport fields to document-level fields
   if (extractedData?.passportNumber) {
-    documentFields.passportNumber = extractedData.passportNumber;
+    // Determine how many characters to take based on nationality
+    const nationality = extractedData?.nationality;
+    const passportLength = getPassportNumberLength(nationality);
+    documentFields.passportNumber = extractedData.passportNumber.substring(0, passportLength);
+    
+    logInfo(`Passport number truncated based on nationality:`, {
+      nationality: nationality,
+      originalLength: extractedData.passportNumber.length,
+      truncatedLength: passportLength,
+      originalNumber: extractedData.passportNumber,
+      truncatedNumber: documentFields.passportNumber
+    });
   }
   
   if (extractedData?.surname) {
@@ -211,11 +287,17 @@ function extractDocumentLevelFields(extractedData) {
   }
   
   if (extractedData?.givenNames && extractedData.givenNames.length > 0) {
-    documentFields.firstname = extractedData.givenNames[0]; // Take first given name
+    // Take only the first part of the first given name (before space or comma)
+    const firstGivenName = extractedData.givenNames[0];
+    documentFields.firstname = firstGivenName.split(/[\s,]+/)[0];
   }
   
   if (extractedData?.birthDate) {
     documentFields.birthDate = extractedData.birthDate;
+  }
+  
+  if (extractedData?.birthPlace) {
+    documentFields.birthPlace = extractedData.birthPlace;
   }
   
   if (extractedData?.issueDate) {
@@ -472,5 +554,6 @@ module.exports = {
   createVerifiedPassportDocument,
   completePassportWithVideo,
   updateUserDataFromVerifiedPassport,
-  extractDocumentLevelFields
+  extractDocumentLevelFields,
+  getPassportNumberLength
 };

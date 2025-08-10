@@ -2,7 +2,7 @@
 
 const {getFirestore} = require("firebase-admin/firestore");
 const {info: logInfo, error: logError} = require("firebase-functions/logger");
-const {createOCRService} = require("./ocrService");
+const {createOCRService} = require("./ocrServiceV2");
 
 /**
  * Process ID document verification workflow
@@ -124,7 +124,15 @@ async function verifyIDSide(imageUrl, side, documentType, docId, filename) {
       }
     };
 
-    // Log all extracted data for debugging
+    // Log extracted data prominently for easy debugging
+    logInfo('🎯 EXTRACTED DATA - EASY TO FIND:', {
+      documentType,
+      side,
+      uploadedDocumentId: docId,
+      ocrProvider: ocrResult.provider,
+      extractedData: ocrResult.extractedData
+    });
+    
     logInfo(`${documentType} ${side} OCR data extracted:`, {
       uploadedDocumentId: docId,
       ocrProvider: ocrResult.provider,
@@ -275,7 +283,7 @@ async function updateVerifiedDocumentForID(userId, side, verificationResult, db,
             'uploadedDocuments.bothSidesCompletedAt': new Date(),
             updatedAt: new Date(),
             // Add any missing document-level fields from verso
-            ...createDocumentLevelUpdateFields(verificationResult.extractedData, existingData)
+            ...createDocumentLevelUpdateFields(verificationResult.extractedData, existingData, 'verso')
           };
 
           await verifiedDocRef.update(updateFields);
@@ -325,7 +333,7 @@ async function updateVerifiedDocumentForID(userId, side, verificationResult, db,
             'uploadedDocuments.overallValid': false,
             updatedAt: new Date(),
             // Add any document-level fields from verso data
-            ...createDocumentLevelUpdateFields(verificationResult.extractedData, existingData)
+            ...createDocumentLevelUpdateFields(verificationResult.extractedData, existingData, 'verso')
           };
 
           await verifiedDocRef.update(updateFields);
@@ -525,11 +533,14 @@ function extractDocumentLevelFields(extractedData) {
   return {
     cardNumber: extractedData.cardAccessNumber || null,
     firstname: Array.isArray(extractedData.givenNames) && extractedData.givenNames.length > 0 
-      ? extractedData.givenNames[0] : null,
+      ? extractedData.givenNames[0].split(/[\s,]+/)[0] : null,
     lastname: extractedData.surname || null,
     birthDate: extractedData.birthDate || null,
+    birthPlace: extractedData.birthPlace || null,
     issueDate: extractedData.issueDate || null,
     expiryDate: extractedData.expiryDate || null,
+    sex: extractedData.sex || null,
+    nationality: extractedData.nationality || null,
     MRZ1: extractedData.mrz1 || null,
     MRZ2: extractedData.mrz2 || null
   };
@@ -538,11 +549,13 @@ function extractDocumentLevelFields(extractedData) {
 /**
  * Helper function to create update fields for document-level data
  * Only includes fields that are not null and not already present in existing data
+ * For verso side: prioritizes issueDate and expiryDate (these should come from verso)
  * @param {Object} extractedData - The extracted data from OCR 
  * @param {Object} existingData - The existing document data
+ * @param {string} side - The side being processed ('recto' or 'verso')
  * @returns {Object} - Update fields object for Firestore
  */
-function createDocumentLevelUpdateFields(extractedData, existingData = {}) {
+function createDocumentLevelUpdateFields(extractedData, existingData = {}, side = null) {
   const newFields = extractDocumentLevelFields(extractedData);
   const updateFields = {};
   
@@ -552,6 +565,17 @@ function createDocumentLevelUpdateFields(extractedData, existingData = {}) {
       updateFields[key] = newFields[key];
     }
   });
+  
+  // Special handling for verso side: always update issueDate and expiryDate from verso
+  // These dates are more reliable from the verso side of French ID cards
+  if (side === 'verso') {
+    if (extractedData.issueDate) {
+      updateFields.issueDate = extractedData.issueDate;
+    }
+    if (extractedData.expiryDate) {
+      updateFields.expiryDate = extractedData.expiryDate;
+    }
+  }
   
   return updateFields;
 }

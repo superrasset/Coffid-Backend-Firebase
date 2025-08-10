@@ -19,15 +19,32 @@ const generateQrCode = onRequest(async (req, res) => {
     }
 
     // Parse multiple infoRequired parameters
-    // Support ampersand-separated values for multiple items
-    // Example: q=majority&firstname
-    let infoRequired;
+    // Support multiple formats:
+    // 1. Ampersand-separated within q: ?q=majority&firstname (as a single parameter)
+    // 2. Multiple query parameters: ?q=majority&firstname (where firstname is a separate parameter)
+    // 3. Comma-separated: ?q=majority,firstname
+    let infoRequired = [];
+    
+    // First, check if q parameter contains separators
     if (queryParam.includes('&')) {
-        // Handle ampersand-separated values (majority&firstname)
+        // Handle ampersand-separated values within q parameter (majority&firstname)
         infoRequired = queryParam.split('&').map(item => item.trim()).filter(item => item.length > 0);
+    } else if (queryParam.includes(',')) {
+        // Handle comma-separated values (majority,firstname)
+        infoRequired = queryParam.split(',').map(item => item.trim()).filter(item => item.length > 0);
     } else {
-        // Single value
+        // Single value in q parameter
         infoRequired = [queryParam.trim()];
+    }
+    
+    // Also check for additional query parameters that might be info requirements
+    // Common info types that might be requested
+    const possibleInfoTypes = ['firstname', 'lastname', 'age', 'majority', 'birthdate', 'nationality', 'sex', 'gender'];
+    
+    for (const infoType of possibleInfoTypes) {
+        if (req.query[infoType] !== undefined && !infoRequired.includes(infoType)) {
+            infoRequired.push(infoType);
+        }
     }
 
     if (infoRequired.length === 0) {
@@ -35,6 +52,7 @@ const generateQrCode = onRequest(async (req, res) => {
     }
 
     console.log('Parsed infoRequired:', infoRequired);
+    console.log('All query parameters:', req.query);
 
     try {
         const pendingRequest = await getFirestore()
