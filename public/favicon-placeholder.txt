@@ -1,0 +1,2 @@
+<!-- This is a placeholder favicon. Replace favicon.ico with your actual Coffid logo file -->
+<!-- The favicon should ideally be a .ico file or .png file at 32x32 pixels or larger -->

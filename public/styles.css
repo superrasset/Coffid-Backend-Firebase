@@ -37,10 +37,30 @@ body {
     margin: 0 auto;
 }
 
+.nav-logo {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.nav-logo-img {
+    height: 32px;
+    width: auto;
+    object-fit: contain;
+    /* Hide image if it fails to load */
+    opacity: 1;
+    transition: opacity 0.3s ease;
+}
+
+.nav-logo-img:not([src]), .nav-logo-img[src=""] {
+    display: none;
+}
+
 .nav-logo h1 {
     color: #2563eb;
     font-size: 1.8rem;
     font-weight: 700;
+    margin: 0;
 }
 
 .nav-menu {
