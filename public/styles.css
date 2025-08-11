@@ -164,8 +164,19 @@ body {
 .phone-mockup {
     max-width: 300px;
     margin: 0 auto;
+    position: relative;
 }
 
+.app-screenshot {
+    width: 100%;
+    height: auto;
+    border-radius: 25px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    object-fit: cover;
+    max-height: 600px;
+}
+
+/* Legacy phone screen styles - kept for backward compatibility */
 .phone-screen {
     background: #1f2937;
     border-radius: 25px;

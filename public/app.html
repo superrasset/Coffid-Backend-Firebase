@@ -6,9 +6,10 @@
     <title>Coffid - Ouvrir l'application</title>
     
     <!-- Favicon -->
-    <link rel="icon" type="image/x-icon" href="/icons/favicon.ico">
     <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32x32.png">
     <link rel="icon" type="image/png" sizes="16x16" href="/icons/favicon-16x16.png">
+    <link rel="shortcut icon" type="image/x-icon" href="/icons/favicon-32x32.png">
+    <link rel="icon" type="image/x-icon" href="/icons/favicon-32x32.png">
     
     <link rel="stylesheet" href="styles.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -182,12 +183,14 @@
             
             // Extract the deep link ID from the current URL
             const currentPath = window.location.pathname;
-            const pathMatch = currentPath.match(/\/second\/([^\/]+)/);
-            const deepLinkId = pathMatch ? pathMatch[1] : null;
+            const secondMatch = currentPath.match(/\/second\/([^\/]+)/);
+            const identityMatch = currentPath.match(/\/identity-check\/([^\/]+)/);
+            const deepLinkId = secondMatch ? secondMatch[1] : (identityMatch ? identityMatch[1] : null);
+            const deepLinkType = secondMatch ? 'second' : (identityMatch ? 'identity-check' : null);
             
             // Get URL parameters for additional deep link data
             const urlParams = new URLSearchParams(window.location.search);
-            const deepLinkPath = urlParams.get('path') || (deepLinkId ? `second/${deepLinkId}` : '');
+            const deepLinkPath = urlParams.get('path') || (deepLinkId && deepLinkType ? `${deepLinkType}/${deepLinkId}` : '');
             const sessionId = urlParams.get('session') || deepLinkId || '';
             
             // Show appropriate download button based on platform
@@ -206,8 +209,8 @@
                 let deepLink = 'coffid://';
                 if (deepLinkPath) {
                     deepLink += deepLinkPath;
-                } else if (deepLinkId) {
-                    deepLink += `second/${deepLinkId}`;
+                } else if (deepLinkId && deepLinkType) {
+                    deepLink += `${deepLinkType}/${deepLinkId}`;
                 }
                 
                 // Try to open the app
@@ -219,23 +222,24 @@
                 iframe.src = deepLink;
                 document.body.appendChild(iframe);
                 
-                // Fallback: if app doesn't open after a delay, redirect to store
+                // Also try window.location as backup method
+                try {
+                    window.location = deepLink;
+                } catch (e) {
+                    // Silent fail if not supported
+                }
+                
+                // More aggressive store redirection - shorter timeout
                 setTimeout(() => {
-                    const timeElapsed = Date.now() - startTime;
-                    // If user didn't leave the page (app didn't open), redirect to store
-                    if (timeElapsed < 2500) {
-                        redirectMessage.textContent = 'Application non trouvée. Redirection vers le store...';
-                        
-                        // Force redirect to appropriate store
-                        setTimeout(() => {
-                            if (isIOS) {
-                                window.location.href = 'https://apps.apple.com/app/coffid/idYOUR_APP_ID';
-                            } else if (isAndroid) {
-                                window.location.href = 'https://play.google.com/store/apps/details?id=com.yourcompany.coffid';
-                            }
-                        }, 1000);
+                    redirectMessage.textContent = 'Redirection vers le store...';
+                    
+                    // Force redirect to appropriate store immediately
+                    if (isIOS) {
+                        window.location.href = 'https://apps.apple.com/app/coffid/idYOUR_APP_ID';
+                    } else if (isAndroid) {
+                        window.location.href = 'https://play.google.com/store/apps/details?id=com.yourcompany.coffid';
                     }
-                }, 2000);
+                }, 1000); // Reduced from 2000ms to 1000ms for faster redirection
                 
                 // Clean up iframe after attempt
                 setTimeout(() => {
@@ -254,8 +258,9 @@
             if (deepLinkId) {
                 const subtitle = document.querySelector('.fallback-subtitle');
                 if (subtitle) {
+                    const actionText = deepLinkType === 'identity-check' ? 'votre vérification d\'identité' : 'votre session';
                     subtitle.innerHTML = `
-                        Pour continuer avec votre session <strong>${deepLinkId}</strong>, 
+                        Pour continuer avec ${actionText} <strong>${deepLinkId}</strong>, 
                         veuillez ouvrir l'application Coffid. Si vous ne l'avez pas encore installée, 
                         téléchargez-la depuis votre store d'applications.
                     `;

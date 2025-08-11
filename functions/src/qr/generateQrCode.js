@@ -74,7 +74,7 @@ const generateQrCode = onRequest(async (req, res) => {
         let contentType;
 
         // Generate QR code URL
-        const qrCodeText = 'https://coffid.com/second/' + pendingRequest.id;
+        const qrCodeText = 'https://coffid.com/identity-check/' + pendingRequest.id;
         
         // TODO: Get format from request parameter
         let qrFormat = 'text';
@@ -94,8 +94,8 @@ const generateQrCode = onRequest(async (req, res) => {
         // Send the QR code back in the appropriate format
         if (contentType === 'application/json') {
             res.status(200).json({ 
-              dataToEncode: qrOutput,
-              taskId: pendingRequest.id,
+              deep_link: qrOutput,
+              task_id: pendingRequest.id,
               infoRequired: infoRequired // Include the parsed array of requirements
             });
         } else {

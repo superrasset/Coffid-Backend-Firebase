@@ -60,6 +60,10 @@
         "destination": "/app.html"
       },
       {
+        "source": "/identity-check/**",
+        "destination": "/app.html"
+      },
+      {
         "source": "/app",
         "destination": "/app.html"
       },
