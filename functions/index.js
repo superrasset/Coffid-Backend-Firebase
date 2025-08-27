@@ -5,8 +5,8 @@ const {initializeApp} = require("firebase-admin/app");
 initializeApp();
 
 // Import all functions from subfolders
-const generateQrCode = require('./src/qr/generateQrCode');
-const getProcessStatus = require('./src/status/getProcessStatus');
+const generateQrCode = require('./src/qr/generateQrCodeAuth0');
+const getProcessStatus = require('./src/status/getProcessStatusAuth0');
 const createUserProfile = require('./src/auth/createUserProfile');
 const healthCheck = require('./src/utils/healthCheck');
 const { processPassportVerification } = require('./src/documentCheck/verifyPassportDocument');
