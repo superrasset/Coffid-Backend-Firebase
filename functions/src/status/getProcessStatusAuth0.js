@@ -52,11 +52,11 @@ const getProcessStatus = onRequest({ cors: true }, async (req, res) => {
         return res.status(403).send('Insufficient permissions: status:read scope required');
     }
 
-    const taskId = req.query.taskId;
-    console.log('Checking status for taskId:', taskId);
+    const taskId = req.query.task_id;
+    console.log('Checking status for task_id:', taskId);
     
     if (!taskId) {
-        return res.status(400).send('Missing "taskId" query parameter.');
+        return res.status(400).send('Missing "task_id" query parameter.');
     }
 
     try {
@@ -74,7 +74,7 @@ const getProcessStatus = onRequest({ cors: true }, async (req, res) => {
         
         // Return only the necessary public information
         res.status(200).json({
-            taskId: taskId,
+            task_id: taskId,
             status: data.status,
             result: data.result || null, // Only return result if available
             infoRequired: data.infoRequired || null, // Include infoRequired if needed
