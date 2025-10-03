@@ -32,73 +32,63 @@
       "port": "4000"
     }
   },
-  "hosting": {
-    "public": "public",
-    "ignore": [
-      "firebase.json",
-      "**/.*",
-      "**/node_modules/**"
-    ],
-    "headers": [
-      {
-        "source": "/.well-known/apple-app-site-association",
-        "headers": [
-          {
-            "key": "Content-Type",
-            "value": "application/json"
-          },
-          {
-            "key": "Cache-Control",
-            "value": "max-age=3600"
-          }
-        ]
-      }
-    ],
-    "rewrites": [
-      {
-        "source": "/second/**",
-        "destination": "/app.html"
-      },
-      {
-        "source": "/identity-check/**",
-        "destination": "/app.html"
-      },
-      {
-        "source": "/app",
-        "destination": "/app.html"
-      },
-      {
-        "source": "/app-en",
-        "destination": "/app-en.html"
-      },
-      {
-        "source": "/test-links",
-        "destination": "/test-links.html"
-      },
-      {
-        "source": "/en",
-        "destination": "/en.html"
-      },
-      {
-        "source": "/cgu",
-        "destination": "/cgu.html"
-      },
-      {
-        "source": "/privacy",
-        "destination": "/privacy.html"
-      },
-      {
-        "source": "/support",
-        "destination": "/support.html"
-      },
-      {
-        "source": "/api/identity-check",
-        "function": "generateQrCode" 
-      },
-      {
-        "source": "/api/check-status",
-        "function": "getProcessStatus" 
-      }
-    ]
-  }
+  "hosting": [
+    {
+      "target": "api",
+      "public": "public",
+      "ignore": [
+        "firebase.json",
+        "**/.*",
+        "**/node_modules/**"
+      ],
+      "headers": [
+        {
+          "source": "/.well-known/apple-app-site-association",
+          "headers": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "key": "Cache-Control",
+              "value": "max-age=3600"
+            }
+          ]
+        }
+      ],
+      "rewrites": [
+        {
+          "source": "/identity-check/**",
+          "destination": "/app.html"
+        },
+        {
+          "source": "/auth-redirect",
+          "destination": "/auth-redirect.html"
+        },
+        {
+          "source": "/api/identity-check",
+          "function": "generateQrCode" 
+        },
+        {
+          "source": "/api/check-status",
+          "function": "getProcessStatus" 
+        }
+      ]
+    },
+    {
+      "target": "app",
+      "public": "public",
+      "ignore": [
+        "firebase.json",
+        "**/.*",
+        "**/node_modules/**"
+      ],
+      "rewrites": [
+        {
+          "source": "**",
+          "destination": "/app.html"
+        }
+      ]
+    }
+  ]
 }

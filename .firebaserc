@@ -4,6 +4,17 @@
     "default": "coffid-2388b",
     "q": "coffid-2388b"
   },
-  "targets": {},
+  "targets": {
+    "coffid-2388b": {
+      "hosting": {
+        "api": [
+          "api-coffid"
+        ],
+        "app": [
+          "app-coffid"
+        ]
+      }
+    }
+  },
   "etags": {}
 }

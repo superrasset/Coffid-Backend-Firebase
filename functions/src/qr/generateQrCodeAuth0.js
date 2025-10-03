@@ -2,6 +2,11 @@ const {onRequest} = require("firebase-functions/v2/https");
 const {getFirestore} = require("firebase-admin/firestore");
 const qrcode = require('qrcode');
 const { auth } = require('express-oauth2-jwt-bearer');
+const https = require('https');
+
+// Configuration pour le logging d'usage
+const BUSINESS_API_KEY = 'coffid-internal-logging-key-2025';
+const LOGGING_ENDPOINT = 'https://us-central1-coffid-business.cloudfunctions.net/logApiUsage';
 
 // Configuration Auth0 pour la validation JWT
 const jwtCheck = auth({
@@ -9,6 +14,70 @@ const jwtCheck = auth({
   issuerBaseURL: 'https://bluelocker.eu.auth0.com/',
   tokenSigningAlg: 'RS256'
 });
+
+/**
+ * Enregistrer l'usage de l'API pour la facturation
+ * @param {string} stripeCustomerId - ID du customer Stripe (depuis Auth0 metadata)
+ * @param {string} clientId - Client ID Auth0 de la clé API
+ * @param {string} endpoint - Endpoint appelé (ex: '/api/identity-check')
+ * @param {number} requests - Nombre de requêtes (défaut: 1)
+ * @param {object} metadata - Métadonnées additionnelles
+ */
+async function logApiUsage(stripeCustomerId, clientId, endpoint, requests = 1, metadata = {}) {
+  try {
+    console.log('🔄 Logging API usage for customer:', stripeCustomerId);
+    
+    const apiKey = BUSINESS_API_KEY;
+    
+    const data = JSON.stringify({
+      stripe_customer_id: stripeCustomerId,
+      client_id: clientId,
+      endpoint: endpoint,
+      requests: requests,
+      organization_id: metadata.organization_id, // Ajouter organization_id au niveau principal
+      organization_name: metadata.organization_name, // Ajouter organization_name au niveau principal
+      metadata: metadata
+    });
+
+    const options = {
+      hostname: 'us-central1-coffid-business.cloudfunctions.net',
+      path: '/logApiUsage',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Length': Buffer.byteLength(data)
+      }
+    };
+
+    const req = https.request(options, (res) => {
+      let responseData = '';
+      
+      res.on('data', (chunk) => {
+        responseData += chunk;
+      });
+      
+      res.on('end', () => {
+        if (res.statusCode >= 200 && res.statusCode < 300) {
+          console.log('✅ Usage logged successfully:', responseData);
+        } else {
+          console.error('❌ Usage logging failed:', res.statusCode, responseData);
+        }
+      });
+    });
+
+    req.on('error', (error) => {
+      console.error('❌ Usage logging request error:', error);
+    });
+
+    req.write(data);
+    req.end();
+
+  } catch (error) {
+    console.error('❌ Usage logging failed:', error);
+    // Ne pas bloquer l'API si le logging échoue
+  }
+}
 
 /**
  * Function to generate a QR code based on text passed as a query parameter
@@ -93,8 +162,7 @@ const generateQrCode = onRequest({ cors: true }, async (req, res) => {
             return res.status(400).send('Please provide valid data to check in the query parameter.');
         }
 
-        console.log('Parsed infoRequired:', infoRequired);
-        console.log('All query parameters:', req.query);
+        console.log('Processing request for info:', infoRequired);
 
         const pendingRequest = await getFirestore()
         .collection("pendingRequest")
@@ -115,7 +183,7 @@ const generateQrCode = onRequest({ cors: true }, async (req, res) => {
         let contentType;
 
         // Generate QR code URL
-        const qrCodeText = 'https://coffid.com/identity-check/' + pendingRequest.id;
+        const qrCodeText = 'https://api.coffid.com/identity-check/' + pendingRequest.id;
         
         // TODO: Get format from request parameter
         let qrFormat = 'text';
@@ -132,6 +200,43 @@ const generateQrCode = onRequest({ cors: true }, async (req, res) => {
                 contentType = 'application/json';
         }
         
+        // Extraire les informations de facturation depuis Auth0 metadata
+        let stripe_customer_id = null;
+        let organization_id = null;
+        let organization_name = null;
+        let client_id = null;
+        
+        if (authToken.payload) {
+            // Récupérer les informations depuis les custom claims namespacés (Action Auth0)
+            stripe_customer_id = authToken.payload["https://coffid.com/stripe_customer_id"];
+            organization_id = authToken.payload["https://coffid.com/organization_id"];
+            organization_name = authToken.payload["https://coffid.com/organization_name"];
+            client_id = authToken.payload.aud; // ou authToken.payload.client_id selon votre config
+            
+            console.log('Auth0 metadata extracted:', { 
+                stripe_customer_id, 
+                organization_id, 
+                organization_name: organization_name || 'NOT_FOUND' 
+            });
+        }
+
+        // Log l'usage de l'API de manière asynchrone et non-bloquante
+        if (stripe_customer_id && client_id) {
+            console.log('Logging usage for customer:', stripe_customer_id);
+            logApiUsage(stripe_customer_id, client_id, '/api/identity-check', 1, {
+                organization_id: organization_id,
+                organization_name: organization_name,
+                task_id: pendingRequest.id,
+                infoRequired: infoRequired,
+                client_requester: 'Demo Platform',
+                timestamp: new Date().toISOString()
+            }).catch(err => {
+                console.error('Logging failed (non-blocking):', err.message);
+            });
+        } else {
+            console.warn('Skipping usage logging - missing Auth0 metadata (stripe_customer_id or client_id)');
+        }
+
         // Send the QR code back in the appropriate format
         if (contentType === 'application/json') {
             res.status(200).json({ 
