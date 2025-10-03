@@ -31,6 +31,7 @@ async function logApiUsage(stripeCustomerId, clientId, endpoint, requests = 1, m
     
     const data = JSON.stringify({
       stripe_customer_id: stripeCustomerId,
+      stripe_subscription_id: metadata.stripe_subscription_id,
       client_id: clientId,
       endpoint: endpoint,
       requests: requests,
@@ -202,6 +203,7 @@ const generateQrCode = onRequest({ cors: true }, async (req, res) => {
         
         // Extraire les informations de facturation depuis Auth0 metadata
         let stripe_customer_id = null;
+        let stripe_subscription_id = null;
         let organization_id = null;
         let organization_name = null;
         let client_id = null;
@@ -209,12 +211,14 @@ const generateQrCode = onRequest({ cors: true }, async (req, res) => {
         if (authToken.payload) {
             // Récupérer les informations depuis les custom claims namespacés (Action Auth0)
             stripe_customer_id = authToken.payload["https://coffid.com/stripe_customer_id"];
+            stripe_subscription_id = authToken.payload["https://coffid.com/stripe_subscription_id"];
             organization_id = authToken.payload["https://coffid.com/organization_id"];
             organization_name = authToken.payload["https://coffid.com/organization_name"];
             client_id = authToken.payload.aud; // ou authToken.payload.client_id selon votre config
             
             console.log('Auth0 metadata extracted:', { 
                 stripe_customer_id, 
+                stripe_subscription_id,
                 organization_id, 
                 organization_name: organization_name || 'NOT_FOUND' 
             });
@@ -224,6 +228,7 @@ const generateQrCode = onRequest({ cors: true }, async (req, res) => {
         if (stripe_customer_id && client_id) {
             console.log('Logging usage for customer:', stripe_customer_id);
             logApiUsage(stripe_customer_id, client_id, '/api/identity-check', 1, {
+                stripe_subscription_id: stripe_subscription_id,
                 organization_id: organization_id,
                 organization_name: organization_name,
                 task_id: pendingRequest.id,
