@@ -165,13 +165,39 @@ const generateQrCode = onRequest({ cors: true }, async (req, res) => {
 
         console.log('Processing request for info:', infoRequired);
 
+        // Extraire les informations de facturation depuis Auth0 metadata
+        let stripe_customer_id = null;
+        let stripe_subscription_id = null;
+        let organization_id = null;
+        let organization_name = null;
+        let display_name = null;
+        let client_id = null;
+        
+        if (authToken.payload) {
+            // Récupérer les informations depuis les custom claims namespacés (Action Auth0)
+            stripe_customer_id = authToken.payload["https://coffid.com/stripe_customer_id"];
+            stripe_subscription_id = authToken.payload["https://coffid.com/stripe_subscription_id"];
+            organization_id = authToken.payload["https://coffid.com/organization_id"];
+            organization_name = authToken.payload["https://coffid.com/organization_name"];
+            display_name = authToken.payload["https://coffid.com/display_name"];
+            client_id = authToken.payload.aud; // ou authToken.payload.client_id selon votre config
+            
+            console.log('Auth0 metadata extracted:', { 
+                stripe_customer_id, 
+                stripe_subscription_id,
+                organization_id, 
+                organization_name: organization_name || 'NOT_FOUND',
+                display_name: display_name || 'NOT_FOUND'
+            });
+        }
+
         const pendingRequest = await getFirestore()
         .collection("pendingRequest")
         
         // TODO: Add switch case to validate input (majorité/age/genre/...)
         
         .add({
-          clientRequester : 'Demo Platform',  
+          clientRequester : display_name || organization_name || 'Unknown Client',  
           infoRequired: infoRequired, // Now stores an array of required information
           status : 'pending',
           createdAt : new Date(),
@@ -201,29 +227,6 @@ const generateQrCode = onRequest({ cors: true }, async (req, res) => {
                 contentType = 'application/json';
         }
         
-        // Extraire les informations de facturation depuis Auth0 metadata
-        let stripe_customer_id = null;
-        let stripe_subscription_id = null;
-        let organization_id = null;
-        let organization_name = null;
-        let client_id = null;
-        
-        if (authToken.payload) {
-            // Récupérer les informations depuis les custom claims namespacés (Action Auth0)
-            stripe_customer_id = authToken.payload["https://coffid.com/stripe_customer_id"];
-            stripe_subscription_id = authToken.payload["https://coffid.com/stripe_subscription_id"];
-            organization_id = authToken.payload["https://coffid.com/organization_id"];
-            organization_name = authToken.payload["https://coffid.com/organization_name"];
-            client_id = authToken.payload.aud; // ou authToken.payload.client_id selon votre config
-            
-            console.log('Auth0 metadata extracted:', { 
-                stripe_customer_id, 
-                stripe_subscription_id,
-                organization_id, 
-                organization_name: organization_name || 'NOT_FOUND' 
-            });
-        }
-
         // Log l'usage de l'API de manière asynchrone et non-bloquante
         if (stripe_customer_id && client_id) {
             console.log('Logging usage for customer:', stripe_customer_id);
@@ -233,7 +236,7 @@ const generateQrCode = onRequest({ cors: true }, async (req, res) => {
                 organization_name: organization_name,
                 task_id: pendingRequest.id,
                 infoRequired: infoRequired,
-                client_requester: 'Demo Platform',
+                client_requester: display_name,
                 timestamp: new Date().toISOString()
             }).catch(err => {
                 console.error('Logging failed (non-blocking):', err.message);
