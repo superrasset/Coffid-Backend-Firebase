@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Télécharger Coffid</title>
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/icons/favicon-16x16.png">
+    <link rel="shortcut icon" type="image/x-icon" href="/icons/favicon-32x32.png">
+    <link rel="icon" type="image/x-icon" href="/icons/favicon-32x32.png">
+    
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        .download-page {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 2rem;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .download-content {
+            max-width: 500px;
+            margin: 0 auto;
+        }
+        
+        .app-icon {
+            width: 100px;
+            height: 100px;
+            background: white;
+            border-radius: 20px;
+            margin: 0 auto 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.5rem;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+        }
+        
+        .download-title {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+        }
+        
+        .download-subtitle {
+            font-size: 1.1rem;
+            margin-bottom: 2rem;
+            opacity: 0.9;
+            line-height: 1.6;
+        }
+        
+        .download-status {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+            padding: 1.5rem;
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 12px;
+            backdrop-filter: blur(10px);
+            margin-bottom: 2rem;
+        }
+        
+        .spinner {
+            width: 24px;
+            height: 24px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-top: 3px solid white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .download-button {
+            display: inline-flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 1rem 2rem;
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid rgba(255, 255, 255, 0.4);
+            border-radius: 12px;
+            color: white;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 1.1rem;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(10px);
+            margin-bottom: 1.5rem;
+        }
+        
+        .download-button:hover {
+            background: rgba(255, 255, 255, 0.3);
+            border-color: rgba(255, 255, 255, 0.6);
+            transform: translateY(-2px);
+        }
+        
+        .download-icon {
+            font-size: 1.5rem;
+        }
+        
+        .info-box {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-top: 1.5rem;
+            font-size: 0.9rem;
+            opacity: 0.8;
+        }
+        
+        .hidden {
+            display: none !important;
+        }
+        
+        .error-message {
+            background: rgba(255, 100, 100, 0.2);
+            border: 1px solid rgba(255, 100, 100, 0.4);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-top: 1rem;
+            color: #ffcccc;
+        }
+        
+        .success-message {
+            background: rgba(100, 255, 100, 0.2);
+            border: 1px solid rgba(100, 255, 100, 0.4);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-top: 1rem;
+            color: #ccffcc;
+        }
+    </style>
+</head>
+<body>
+    <div class="download-page">
+        <div class="download-content">
+            <div class="app-icon">
+                🔐
+            </div>
+            
+            <h1 class="download-title">Télécharger Coffid</h1>
+            <p class="download-subtitle" id="subtitle">
+                Téléchargement automatique de l'application Coffid en cours...
+            </p>
+            
+            <div class="download-status" id="status-container">
+                <div class="spinner" id="spinner"></div>
+                <span id="status-text">Préparation du téléchargement...</span>
+            </div>
+            
+            <!-- Manual download button (hidden by default) -->
+            <a href="/apk/coffid-latest.apk" class="download-button hidden" id="manual-download" download="Coffid.apk">
+                <span class="download-icon">📱</span>
+                <span>Télécharger manuellement</span>
+            </a>
+            
+            <!-- iOS fallback -->
+            <a href="https://apps.apple.com/app/coffid/id6751286855" class="download-button hidden" id="ios-download">
+                <span class="download-icon">🍎</span>
+                <span>Télécharger sur l'App Store</span>
+            </a>
+            
+            <div class="info-box" id="info-box">
+                <strong>📱 Installation Android :</strong><br>
+                1. Le fichier APK va se télécharger automatiquement<br>
+                2. Autorisez l'installation depuis "Sources inconnues" si demandé<br>
+                3. Suivez les instructions d'installation
+            </div>
+            
+            <div class="error-message hidden" id="error-message">
+                <strong>❌ Erreur de téléchargement</strong><br>
+                <span id="error-details">Une erreur s'est produite lors du téléchargement.</span>
+            </div>
+            
+            <div class="success-message hidden" id="success-message">
+                <strong>✅ Téléchargement réussi !</strong><br>
+                Vérifiez vos téléchargements et installez l'application.
+            </div>
+        </div>
+    </div>
+
+    <script>
+        (function() {
+            const userAgent = navigator.userAgent || navigator.vendor || window.opera;
+            const isIOS = /iPad|iPhone|iPod/.test(userAgent) && !window.MSStream;
+            const isAndroid = /android/i.test(userAgent);
+            const isMobile = isIOS || isAndroid;
+            
+            const statusText = document.getElementById('status-text');
+            const spinner = document.getElementById('spinner');
+            const subtitle = document.getElementById('subtitle');
+            const manualDownload = document.getElementById('manual-download');
+            const iosDownload = document.getElementById('ios-download');
+            const infoBox = document.getElementById('info-box');
+            const errorMessage = document.getElementById('error-message');
+            const successMessage = document.getElementById('success-message');
+            
+            // Extract deep link information for continuity
+            const urlParams = new URLSearchParams(window.location.search);
+            const deepLinkPath = urlParams.get('path') || '';
+            const taskId = urlParams.get('taskId') || '';
+            
+            if (isIOS) {
+                // iOS users - redirect to App Store
+                subtitle.textContent = "Redirection vers l'App Store pour iOS...";
+                statusText.textContent = "Ouverture de l'App Store...";
+                infoBox.classList.add('hidden');
+                
+                setTimeout(() => {
+                    window.location.href = 'https://apps.apple.com/app/coffid/id6751286855';
+                }, 1000);
+                
+                // Show iOS button as fallback
+                setTimeout(() => {
+                    spinner.classList.add('hidden');
+                    statusText.textContent = "Si la redirection ne fonctionne pas :";
+                    iosDownload.classList.remove('hidden');
+                }, 3000);
+                
+            } else if (isAndroid) {
+                // Android users - direct APK download
+                subtitle.textContent = "Téléchargement direct de l'APK Android...";
+                statusText.textContent = "Démarrage du téléchargement...";
+                
+                // Auto-download APK after short delay
+                setTimeout(() => {
+                    statusText.textContent = "Téléchargement en cours...";
+                    
+                    // Create download link and trigger it
+                    const downloadLink = document.createElement('a');
+                    downloadLink.href = '/apk/coffid-latest.apk';
+                    downloadLink.download = 'Coffid.apk';
+                    downloadLink.style.display = 'none';
+                    document.body.appendChild(downloadLink);
+                    
+                    try {
+                        downloadLink.click();
+                        
+                        // Show success message
+                        setTimeout(() => {
+                            spinner.classList.add('hidden');
+                            statusText.textContent = "Téléchargement lancé !";
+                            successMessage.classList.remove('hidden');
+                            manualDownload.classList.remove('hidden');
+                        }, 1500);
+                        
+                    } catch (error) {
+                        // Show error and manual download
+                        spinner.classList.add('hidden');
+                        statusText.textContent = "Téléchargement automatique échoué";
+                        errorMessage.classList.remove('hidden');
+                        document.getElementById('error-details').textContent = 
+                            "Veuillez utiliser le bouton de téléchargement manuel ci-dessous.";
+                        manualDownload.classList.remove('hidden');
+                    }
+                    
+                    // Clean up
+                    document.body.removeChild(downloadLink);
+                    
+                }, 1500);
+                
+                // Show manual download as backup
+                setTimeout(() => {
+                    if (!successMessage.classList.contains('hidden')) return;
+                    manualDownload.classList.remove('hidden');
+                }, 5000);
+                
+            } else {
+                // Desktop - show information and options
+                subtitle.textContent = "Coffid est une application mobile. Scannez le QR code depuis votre téléphone.";
+                statusText.textContent = "Application mobile uniquement";
+                spinner.classList.add('hidden');
+                infoBox.innerHTML = `
+                    <strong>📱 Pour utiliser Coffid :</strong><br>
+                    • <strong>iOS :</strong> Téléchargez depuis l'App Store<br>
+                    • <strong>Android :</strong> Téléchargez l'APK directement<br><br>
+                    Visitez cette page depuis votre téléphone pour télécharger automatiquement.
+                `;
+                
+                // Show both download options
+                setTimeout(() => {
+                    manualDownload.classList.remove('hidden');
+                    iosDownload.classList.remove('hidden');
+                }, 1000);
+            }
+            
+            // Add deep link continuation if available
+            if (deepLinkPath || taskId) {
+                const linkInfo = document.createElement('div');
+                linkInfo.className = 'info-box';
+                linkInfo.style.marginTop = '1rem';
+                linkInfo.innerHTML = `
+                    <strong>🔗 Lien de continuation :</strong><br>
+                    Après installation, l'application s'ouvrira automatiquement${taskId ? ` pour la tâche ${taskId}` : ''}.
+                `;
+                document.querySelector('.download-content').appendChild(linkInfo);
+            }
+            
+        })();
+    </script>
+</body>
+</html>

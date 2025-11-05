@@ -32,63 +32,66 @@
       "port": "4000"
     }
   },
-  "hosting": [
-    {
-      "target": "api",
-      "public": "public",
-      "ignore": [
-        "firebase.json",
-        "**/.*",
-        "**/node_modules/**"
-      ],
-      "headers": [
-        {
-          "source": "/.well-known/apple-app-site-association",
-          "headers": [
-            {
-              "key": "Content-Type",
-              "value": "application/json"
-            },
-            {
-              "key": "Cache-Control",
-              "value": "max-age=3600"
-            }
-          ]
-        }
-      ],
-      "rewrites": [
-        {
-          "source": "/identity-check/**",
-          "destination": "/app.html"
-        },
-        {
-          "source": "/auth-redirect",
-          "destination": "/auth-redirect.html"
-        },
-        {
-          "source": "/api/identity-check",
-          "function": "generateQrCode" 
-        },
-        {
-          "source": "/api/check-status",
-          "function": "getProcessStatus" 
-        }
-      ]
-    },
-    {
-      "target": "app",
-      "public": "public",
-      "ignore": [
-        "firebase.json",
-        "**/.*",
-        "**/node_modules/**"
-      ],
-      "rewrites": [
-        {
-          "source": "**",
-          "destination": "/app.html"
-        }
-      ]
-    }
-  ]
+  "hosting": {
+    "public": "public",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "headers": [
+      {
+        "source": "/.well-known/apple-app-site-association",
+        "headers": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Cache-Control",
+            "value": "max-age=3600"
+          }
+        ]
+      },
+      {
+        "source": "/apk/**/*.apk",
+        "headers": [
+          {
+            "key": "Content-Type",
+            "value": "application/vnd.android.package-archive"
+          },
+          {
+            "key": "Content-Disposition",
+            "value": "attachment; filename=\"Coffid.apk\""
+          },
+          {
+            "key": "Cache-Control",
+            "value": "max-age=86400"
+          }
+        ]
+      }
+    ],
+    "rewrites": [
+      {
+        "source": "/identity-check/**",
+        "destination": "/app.html"
+      },
+      {
+        "source": "/download",
+        "destination": "/download.html"
+      },
+      {
+        "source": "/auth-redirect",
+        "destination": "/auth-redirect.html"
+      },
+      {
+        "source": "/api/identity-check",
+        "function": "generateQrCode" 
+      },
+      {
+        "source": "/api/check-status",
+        "function": "getProcessStatus" 
+      }
+    ]
+  }
 }

@@ -15,7 +15,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     
     <!-- Smart App Banner for iOS -->
-    <meta name="apple-itunes-app" content="app-id=YOUR_APP_ID">
+    <meta name="apple-itunes-app" content="app-id=6751286855">
     
     <!-- Open Graph for better social sharing -->
     <meta property="og:title" content="Coffid - Vérification d'identité sécurisée">
@@ -42,36 +42,59 @@
         }
         
         .app-icon {
-            width: 120px;
-            height: 120px;
+            width: 80px;
+            height: 80px;
             background: white;
-            border-radius: 24px;
-            margin: 0 auto 2rem;
+            border-radius: 16px;
+            margin: 0 auto 1.5rem;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 3rem;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            font-size: 2rem;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.2);
         }
         
         .fallback-title {
-            font-size: 2rem;
-            font-weight: 700;
-            margin-bottom: 1rem;
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
         }
         
         .fallback-subtitle {
-            font-size: 1.1rem;
-            margin-bottom: 2rem;
+            font-size: 1rem;
+            margin-bottom: 1.5rem;
             opacity: 0.9;
-            line-height: 1.6;
+            line-height: 1.5;
         }
         
-        .download-buttons {
+        .redirect-status {
             display: flex;
-            flex-direction: column;
-            gap: 1rem;
             align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+            padding: 1rem;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            backdrop-filter: blur(10px);
+            margin-bottom: 1rem;
+        }
+        
+        .spinner {
+            width: 20px;
+            height: 20px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-top: 2px solid white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .hidden {
+            display: none !important;
         }
         
         .store-button {
@@ -79,7 +102,7 @@
             align-items: center;
             gap: 0.75rem;
             padding: 0.75rem 1.5rem;
-            background: rgba(255, 255, 255, 0.1);
+            background: rgba(255, 255, 255, 0.15);
             border: 2px solid rgba(255, 255, 255, 0.3);
             border-radius: 12px;
             color: white;
@@ -87,45 +110,17 @@
             font-weight: 500;
             transition: all 0.3s ease;
             backdrop-filter: blur(10px);
-            min-width: 200px;
+            margin-top: 1rem;
         }
         
         .store-button:hover {
-            background: rgba(255, 255, 255, 0.2);
+            background: rgba(255, 255, 255, 0.25);
             border-color: rgba(255, 255, 255, 0.5);
             transform: translateY(-2px);
         }
         
         .store-icon {
-            font-size: 1.5rem;
-        }
-        
-        .continue-web {
-            margin-top: 2rem;
-            padding-top: 2rem;
-            border-top: 1px solid rgba(255, 255, 255, 0.2);
-        }
-        
-        .web-link {
-            color: rgba(255, 255, 255, 0.8);
-            text-decoration: underline;
-        }
-        
-        .web-link:hover {
-            color: white;
-        }
-        
-        .auto-redirect {
-            margin-top: 1rem;
-            font-size: 0.9rem;
-            opacity: 0.7;
-        }
-        
-        @media (min-width: 768px) {
-            .download-buttons {
-                flex-direction: row;
-                justify-content: center;
-            }
+            font-size: 1.2rem;
         }
     </style>
 </head>
@@ -136,150 +131,106 @@
                 🔐
             </div>
             
-            <h1 class="fallback-title">Ouvrir l'application Coffid</h1>
+            <h1 class="fallback-title">Coffid</h1>
             <p class="fallback-subtitle">
-                Pour continuer votre vérification d'identité, nous allons tenter d'ouvrir l'application Coffid. 
-                Si vous ne l'avez pas encore installée, vous serez automatiquement redirigé vers le store pour la télécharger.
+                Redirection vers l'application en cours...
             </p>
             
-            <div class="download-buttons" style="display: none;">
-                <!-- Buttons hidden since we auto-redirect -->
-                <a href="https://apps.apple.com/app/coffid/idYOUR_APP_ID" class="store-button" id="ios-button">
-                    <span class="store-icon">🍎</span>
-                    <div>
-                        <div style="font-size: 0.8rem; opacity: 0.8;">Télécharger sur</div>
-                        <div style="font-weight: 600;">App Store</div>
-                    </div>
-                </a>
-                
-                <a href="https://play.google.com/store/apps/details?id=com.yourcompany.coffid" class="store-button" id="android-button">
-                    <span class="store-icon">🤖</span>
-                    <div>
-                        <div style="font-size: 0.8rem; opacity: 0.8;">Disponible sur</div>
-                        <div style="font-weight: 600;">Google Play</div>
-                    </div>
-                </a>
+            <div class="redirect-status" id="status-container">
+                <div class="spinner"></div>
+                <span id="status-text">Ouverture de l'application...</span>
             </div>
             
-            <div class="continue-web">
-                <p>
-                    Vous pouvez aussi <a href="/" class="web-link">continuer sur le web</a> 
-                    pour découvrir Coffid.
-                </p>
-                <div class="auto-redirect" id="redirect-message" style="display: none;">
-                    Tentative d'ouverture de l'application en cours...
-                </div>
-            </div>
+            <!-- Fallback button (hidden by default, shown if redirect fails) -->
+            <a href="https://apps.apple.com/app/coffid/id6751286855" class="store-button hidden" id="fallback-button">
+                <span class="store-icon">🍎</span>
+                <span>Télécharger Coffid</span>
+            </a>
         </div>
     </div>
 
     <script>
-        // Universal Link fallback logic
+        // Ultra-fast app redirect logic
         (function() {
             const userAgent = navigator.userAgent || navigator.vendor || window.opera;
             const isIOS = /iPad|iPhone|iPod/.test(userAgent) && !window.MSStream;
             const isAndroid = /android/i.test(userAgent);
             const isMobile = isIOS || isAndroid;
             
-            // Extract the deep link ID from the current URL
+            // Extract deep link information
             const currentPath = window.location.pathname;
-            const secondMatch = currentPath.match(/\/second\/([^\/]+)/);
             const identityMatch = currentPath.match(/\/identity-check\/([^\/]+)/);
-            const deepLinkId = secondMatch ? secondMatch[1] : (identityMatch ? identityMatch[1] : null);
-            const deepLinkType = secondMatch ? 'second' : (identityMatch ? 'identity-check' : null);
+            const deepLinkId = identityMatch ? identityMatch[1] : null;
             
-            // Get URL parameters for additional deep link data
-            const urlParams = new URLSearchParams(window.location.search);
-            const deepLinkPath = urlParams.get('path') || (deepLinkId && deepLinkType ? `${deepLinkType}/${deepLinkId}` : '');
-            const sessionId = urlParams.get('session') || deepLinkId || '';
+            const statusText = document.getElementById('status-text');
+            const fallbackButton = document.getElementById('fallback-button');
             
-            // Show appropriate download button based on platform
-            if (isIOS) {
-                document.getElementById('android-button').style.display = 'none';
-            } else if (isAndroid) {
-                document.getElementById('ios-button').style.display = 'none';
-            }
-            
-            // Attempt to open the app if on mobile
+            // Immediate redirect for mobile users
             if (isMobile) {
-                const redirectMessage = document.getElementById('redirect-message');
-                redirectMessage.style.display = 'block';
-                
-                // Construct the deep link with the extracted ID
+                // Construct the deep link
                 let deepLink = 'coffid://';
-                if (deepLinkPath) {
-                    deepLink += deepLinkPath;
-                } else if (deepLinkId && deepLinkType) {
-                    deepLink += `${deepLinkType}/${deepLinkId}`;
+                if (deepLinkId) {
+                    deepLink += `identity-check/${deepLinkId}`;
                 }
                 
-                // Try to open the app
-                const startTime = Date.now();
-                
-                // Create a hidden iframe to trigger the app
-                const iframe = document.createElement('iframe');
-                iframe.style.display = 'none';
-                iframe.src = deepLink;
-                document.body.appendChild(iframe);
-                
-                // Also try window.location as backup method
-                try {
-                    window.location = deepLink;
-                } catch (e) {
-                    // Silent fail if not supported
-                }
-                
-                // More aggressive store redirection - shorter timeout
-                setTimeout(() => {
-                    redirectMessage.textContent = 'Redirection vers le store...';
+                if (isIOS) {
+                    // iOS: Direct App Store redirect without popup
+                    statusText.textContent = "Redirection vers l'App Store...";
                     
-                    // Force redirect to appropriate store immediately
-                    if (isIOS) {
-                        window.location.href = 'https://apps.apple.com/app/coffid/idYOUR_APP_ID';
-                    } else if (isAndroid) {
-                        window.location.href = 'https://play.google.com/store/apps/details?id=com.yourcompany.coffid';
+                    // Immediate App Store redirect - no iframe to avoid popups
+                    setTimeout(() => {
+                        window.location.href = 'https://apps.apple.com/app/coffid/id6751286855';
+                    }, 200); // Quick 200ms redirect
+                    
+                } else if (isAndroid) {
+                    // Android: Redirect to download page for direct APK download
+                    statusText.textContent = "Redirection vers le téléchargement...";
+                    
+                    // Preserve deep link information for download page
+                    let downloadUrl = '/download';
+                    if (deepLinkId) {
+                        downloadUrl += `?taskId=${deepLinkId}&path=${encodeURIComponent(currentPath)}`;
                     }
-                }, 1000); // Reduced from 2000ms to 1000ms for faster redirection
+                    
+                    setTimeout(() => {
+                        window.location.href = downloadUrl;
+                    }, 300);
+                }
                 
-                // Clean up iframe after attempt
+                // Show fallback button if redirect fails (backup)
                 setTimeout(() => {
-                    if (iframe.parentNode) {
-                        document.body.removeChild(iframe);
+                    statusText.textContent = "Si la redirection ne fonctionne pas :";
+                    fallbackButton.classList.remove('hidden');
+                    if (isAndroid) {
+                        fallbackButton.href = '/download';
+                        fallbackButton.innerHTML = '<span class="store-icon">📱</span><span>Télécharger Coffid APK</span>';
                     }
-                }, 100);
+                }, 2000);
+                
             } else {
-                // Desktop users - redirect to home page
+                // Desktop: Quick redirect to main site
+                statusText.textContent = "Redirection vers le site...";
                 setTimeout(() => {
                     window.location.href = '/';
-                }, 2000);
+                }, 1000);
             }
             
-            // Update the page content with the deep link info if available
-            if (deepLinkId) {
-                const subtitle = document.querySelector('.fallback-subtitle');
-                if (subtitle) {
-                    const actionText = deepLinkType === 'identity-check' ? 'votre vérification d\'identité' : 'votre session';
-                    subtitle.innerHTML = `
-                        Pour continuer avec ${actionText} <strong>${deepLinkId}</strong>, 
-                        veuillez ouvrir l'application Coffid. Si vous ne l'avez pas encore installée, 
-                        téléchargez-la depuis votre store d'applications.
-                    `;
+            // Track if user leaves page (likely opened app successfully)
+            let userLeft = false;
+            
+            function handleUserLeaving() {
+                if (!userLeft) {
+                    userLeft = true;
+                    console.log('User likely opened the app successfully');
                 }
             }
             
-            // Track page visibility to detect if user left to open app
-            let hidden = false;
+            document.addEventListener('visibilitychange', () => {
+                if (document.hidden) handleUserLeaving();
+            });
             
-            function handleVisibilityChange() {
-                if (document.hidden && !hidden) {
-                    hidden = true;
-                    // User likely opened the app
-                    console.log('User potentially opened the app');
-                }
-            }
-            
-            document.addEventListener('visibilitychange', handleVisibilityChange);
-            window.addEventListener('blur', handleVisibilityChange);
+            window.addEventListener('blur', handleUserLeaving);
+            window.addEventListener('pagehide', handleUserLeaving);
             
         })();
     </script>
