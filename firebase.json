@@ -91,6 +91,10 @@
       {
         "source": "/api/check-status",
         "function": "getProcessStatus" 
+      },
+      {
+        "source": "/api/token",
+        "function": "getToken"
       }
     ]
   }
