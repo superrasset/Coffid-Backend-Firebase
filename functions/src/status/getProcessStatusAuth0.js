@@ -1,55 +1,33 @@
 const {onRequest} = require("firebase-functions/v2/https");
 const {getFirestore} = require("firebase-admin/firestore");
-const { auth } = require('express-oauth2-jwt-bearer');
-
-// Configuration Auth0 pour la validation JWT
-const jwtCheck = auth({
-  audience: 'https://coffid.com/api',
-  issuerBaseURL: 'https://bluelocker.eu.auth0.com/',
-  tokenSigningAlg: 'RS256'
-});
+const { authenticateRequest } = require('../auth/authMiddleware');
 
 /**
  * HTTP Trigger - Allows client to poll for status of verification requests
- * Protected with Auth0 JWT authentication and scope verification
+ * Protected with unified authentication (Auth0 JWT OR API Key)
  * 
  * @param {Object} req - HTTP request object
  * @param {Object} res - HTTP response object
  */
 const getProcessStatus = onRequest({ cors: true }, async (req, res) => {
-    // Apply Auth0 JWT validation
+    // Apply unified authentication middleware
     try {
-        await new Promise((resolve, reject) => {
-            jwtCheck(req, res, (err) => {
-                if (err) reject(err);
-                else resolve();
-            });
-        });
+        await authenticateRequest(req, res);
     } catch (error) {
-        console.error('Auth0 JWT validation failed:', error);
-        return res.status(401).send('Unauthorized');
+        // Response already sent by middleware
+        return;
     }
 
-    // Verify that the token has the required scope
-    const authToken = req.auth;
+    // Verify scope (accept both 'status:read' for Auth0 compatibility and 'identity:status')
+    const hasStatusScope = req.authContext.scopes.includes('status:read') || 
+                           req.authContext.scopes.includes('identity:status');
     
-    if (!authToken) {
-        console.error('No auth token found');
-        return res.status(403).send('Insufficient permissions: no auth token');
-    }
-
-    // Check for scope in the token payload
-    let scopes = [];
-    if (authToken.payload && authToken.payload.scope) {
-        scopes = authToken.payload.scope.split(' ');
-    } else {
-        console.error('No scope found in token');
-        return res.status(403).send('Insufficient permissions: no scope found');
-    }
-
-    if (!scopes.includes('status:read')) {
-        console.error('Required scope "status:read" not found in token. Available scopes:', scopes);
-        return res.status(403).send('Insufficient permissions: status:read scope required');
+    if (!hasStatusScope) {
+        console.error('Required scope "status:read" or "identity:status" not found. Available scopes:', req.authContext.scopes);
+        return res.status(403).json({ 
+            error: 'Insufficient permissions: status:read or identity:status scope required',
+            available_scopes: req.authContext.scopes
+        });
     }
 
     const taskId = req.query.task_id;

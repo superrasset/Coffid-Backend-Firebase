@@ -13,6 +13,7 @@ const healthCheck = require('./src/utils/healthCheck');
 const { processPassportVerification } = require('./src/documentCheck/verifyPassportDocument');
 const { processUploadedDocument } = require('./src/documentCheck/documentProcessor');
 const processVideoValidation = require('./src/video/processVideoValidation');
+const { storeApiKey, revokeApiKey } = require('./src/apiKeys/manageApiKeys');
 
 // Export all functions
 exports.generateQrCode = generateQrCode;
@@ -22,6 +23,8 @@ exports.getToken = getToken;
 exports.healthCheck = healthCheck;
 exports.processUploadedDocument = processUploadedDocument;
 exports.processVideoValidation = processVideoValidation;
+exports.storeApiKey = storeApiKey;
+exports.revokeApiKey = revokeApiKey;
 
 // -----------------------------------------------------------------------------------------------------------
 // ---------------------------------------------API ENDPOINTS-------------------------------------------------

@@ -1,19 +1,12 @@
 const {onRequest} = require("firebase-functions/v2/https");
 const {getFirestore} = require("firebase-admin/firestore");
 const qrcode = require('qrcode');
-const { auth } = require('express-oauth2-jwt-bearer');
 const https = require('https');
+const { authenticateRequest, requireScope } = require('../auth/authMiddleware');
 
 // Configuration pour le logging d'usage
 const BUSINESS_API_KEY = 'coffid-internal-logging-key-2025';
 const LOGGING_ENDPOINT = 'https://us-central1-coffid-business.cloudfunctions.net/logApiUsage';
-
-// Configuration Auth0 pour la validation JWT
-const jwtCheck = auth({
-  audience: 'https://coffid.com/api',
-  issuerBaseURL: 'https://bluelocker.eu.auth0.com/',
-  tokenSigningAlg: 'RS256'
-});
 
 /**
  * Enregistrer l'usage de l'API pour la facturation
@@ -83,42 +76,24 @@ async function logApiUsage(stripeCustomerId, clientId, endpoint, requests = 1, m
 /**
  * Function to generate a QR code based on text passed as a query parameter
  * Creates a pending request in Firestore and returns QR code data
- * Protected with Auth0 JWT authentication and scope verification
+ * Protected with unified authentication (Auth0 JWT OR API Key)
  */
 const generateQrCode = onRequest({ cors: true }, async (req, res) => {
-    // Apply Auth0 JWT validation
+    // Apply unified authentication middleware
     try {
-        await new Promise((resolve, reject) => {
-            jwtCheck(req, res, (err) => {
-                if (err) reject(err);
-                else resolve();
-            });
-        });
+        await authenticateRequest(req, res);
     } catch (error) {
-        console.error('Auth0 JWT validation failed:', error);
-        return res.status(401).send('Unauthorized');
+        // Response already sent by middleware
+        return;
     }
 
-    // Verify that the token has the required scope
-    const authToken = req.auth;
-    
-    if (!authToken) {
-        console.error('No auth token found');
-        return res.status(403).send('Insufficient permissions: no auth token');
-    }
-
-    // Check for scope in the token payload
-    let scopes = [];
-    if (authToken.payload && authToken.payload.scope) {
-        scopes = authToken.payload.scope.split(' ');
-    } else {
-        console.error('No scope found in token');
-        return res.status(403).send('Insufficient permissions: no scope found');
-    }
-
-    if (!scopes.includes('identity:generate')) {
-        console.error('Required scope "identity:generate" not found in token. Available scopes:', scopes);
-        return res.status(403).send('Insufficient permissions: identity:generate scope required');
+    // Verify scope
+    if (!req.authContext.scopes.includes('identity:generate')) {
+        console.error('Required scope "identity:generate" not found. Available scopes:', req.authContext.scopes);
+        return res.status(403).json({ 
+            error: 'Insufficient permissions: identity:generate scope required',
+            available_scopes: req.authContext.scopes
+        });
     }
 
     try {
@@ -165,31 +140,25 @@ const generateQrCode = onRequest({ cors: true }, async (req, res) => {
 
         console.log('Processing request for info:', infoRequired);
 
-        // Extraire les informations de facturation depuis Auth0 metadata
-        let stripe_customer_id = null;
-        let stripe_subscription_id = null;
-        let organization_id = null;
-        let organization_name = null;
-        let display_name = null;
-        let client_id = null;
+        // Extraire les informations depuis authContext (Auth0 ou API Key)
+        const {
+            customer_id,
+            subscription_id,
+            organization_id,
+            organization_name,
+            display_name,
+            client_id,
+            method
+        } = req.authContext;
         
-        if (authToken.payload) {
-            // Récupérer les informations depuis les custom claims namespacés (Action Auth0)
-            stripe_customer_id = authToken.payload["https://coffid.com/stripe_customer_id"];
-            stripe_subscription_id = authToken.payload["https://coffid.com/stripe_subscription_id"];
-            organization_id = authToken.payload["https://coffid.com/organization_id"];
-            organization_name = authToken.payload["https://coffid.com/organization_name"];
-            display_name = authToken.payload["https://coffid.com/display_name"];
-            client_id = authToken.payload.aud; // ou authToken.payload.client_id selon votre config
-            
-            console.log('Auth0 metadata extracted:', { 
-                stripe_customer_id, 
-                stripe_subscription_id,
-                organization_id, 
-                organization_name: organization_name || 'NOT_FOUND',
-                display_name: display_name || 'NOT_FOUND'
-            });
-        }
+        console.log('Auth context:', { 
+            method,
+            customer_id, 
+            subscription_id,
+            organization_id, 
+            organization_name,
+            display_name
+        });
 
         const pendingRequest = await getFirestore()
         .collection("pendingRequest")
@@ -228,21 +197,22 @@ const generateQrCode = onRequest({ cors: true }, async (req, res) => {
         }
         
         // Log l'usage de l'API de manière asynchrone et non-bloquante
-        if (stripe_customer_id && client_id) {
-            console.log('Logging usage for customer:', stripe_customer_id);
-            logApiUsage(stripe_customer_id, client_id, '/api/identity-check', 1, {
-                stripe_subscription_id: stripe_subscription_id,
+        if (customer_id && client_id) {
+            console.log('Logging usage for customer:', customer_id);
+            logApiUsage(customer_id, client_id, '/api/identity-check', 1, {
+                stripe_subscription_id: subscription_id,
                 organization_id: organization_id,
                 organization_name: organization_name,
                 task_id: pendingRequest.id,
                 infoRequired: infoRequired,
                 client_requester: display_name,
+                auth_method: method,
                 timestamp: new Date().toISOString()
             }).catch(err => {
                 console.error('Logging failed (non-blocking):', err.message);
             });
         } else {
-            console.warn('Skipping usage logging - missing Auth0 metadata (stripe_customer_id or client_id)');
+            console.warn('Skipping usage logging - missing customer_id or client_id');
         }
 
         // Send the QR code back in the appropriate format
