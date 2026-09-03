@@ -126,6 +126,12 @@ async function validateApiKey(req, apiKey) {
     const keyData = keyDoc.data();
 
     console.log('✅ API key validated for organization:', keyData.organization_name);
+    console.log('🔍 Debug Firestore keyData:', {
+      display_name_raw: keyData.display_name,
+      display_name_type: typeof keyData.display_name,
+      organization_name: keyData.organization_name,
+      will_use: keyData.display_name || keyData.organization_name
+    });
 
     // Mettre à jour last_used_at de manière asynchrone (non-bloquant)
     updateLastUsed(keyDoc.id).catch(err => {

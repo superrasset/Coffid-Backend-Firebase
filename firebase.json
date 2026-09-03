@@ -54,6 +54,19 @@
         ]
       },
       {
+        "source": "/.well-known/assetlinks.json",
+        "headers": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Cache-Control",
+            "value": "max-age=3600"
+          }
+        ]
+      },
+      {
         "source": "/apk/**/*.apk",
         "headers": [
           {
@@ -74,7 +87,7 @@
     "rewrites": [
       {
         "source": "/identity-check/**",
-        "destination": "/app.html"
+        "destination": "/web-app/index.html"
       },
       {
         "source": "/download",

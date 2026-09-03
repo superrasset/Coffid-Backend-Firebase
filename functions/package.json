@@ -9,10 +9,11 @@
     "logs": "firebase functions:log"
   },
   "engines": {
-    "node": "20"
+    "node": "22"
   },
   "main": "index.js",
   "dependencies": {
+    "aws-sdk": "^2.1693.0",
     "axios": "^1.7.2",
     "cors": "^2.8.5",
     "dotenv": "^17.2.1",
@@ -22,6 +23,7 @@
     "firebase-functions": "^5.1.0",
     "form-data": "^4.0.0",
     "mindee": "^4.29.0-rc5",
+    "node-fetch": "^2.7.0",
     "qrcode": "^1.5.4"
   },
   "devDependencies": {

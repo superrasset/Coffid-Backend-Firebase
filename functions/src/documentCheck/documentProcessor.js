@@ -1,13 +1,26 @@
 const {onDocumentCreated} = require("firebase-functions/v2/firestore");
 const {info: logInfo, error: logError} = require("firebase-functions/logger");
+const {defineSecret} = require("firebase-functions/params");
 const { processIDDocument } = require('./verifyIDDocument');
 const { processPassportDocument } = require('./verifyPassportDocument');
+const { processSelfieDocument } = require('../faceMatching/verifySelfieDocument');
+const { awsAccessKeyId, awsSecretAccessKey } = require('../faceMatching/awsRekognitionService');
+
+// Define secrets for sensitive credentials
+const mindeeApiKey = defineSecret("MINDEE_API_KEY");
 
 /**
  * Firestore trigger that processes newly uploaded documents
  * Routes documents to appropriate verification handlers based on documentType only
+ * Uses AWS Rekognition for selfie face matching and Mindee for document OCR
+ * Requires secrets: AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, MINDEE_API_KEY
  */
-const processUploadedDocument = onDocumentCreated("uploadedDocument/{docId}", async (event) => {
+const processUploadedDocument = onDocumentCreated(
+  {
+    document: "uploadedDocument/{docId}",
+    secrets: [awsAccessKeyId, awsSecretAccessKey, mindeeApiKey]
+  },
+  async (event) => {
   const docId = event.params.docId;
   const newData = event.data.data();
 
@@ -44,75 +57,6 @@ const processUploadedDocument = onDocumentCreated("uploadedDocument/{docId}", as
     // Normalize the document type by trimming whitespace
     const normalizedType = documentType?.trim();
     
-    // Check if this is a face/video upload (no side field, has video-specific fields)
-    if (newData.faceRecordingUrl || newData.videoUrl || (!newData.side && (newData.filename?.includes('video') || newData.filename?.includes('face')))) {
-      logInfo(`Detected face/video upload for user ${newData.userId}`, {
-        side: newData.side || 'none',
-        hasFaceRecordingUrl: !!newData.faceRecordingUrl,
-        hasVideoUrl: !!newData.videoUrl,
-        filename: newData.filename,
-        documentType: normalizedType
-      });
-      
-      try {
-        // For face recordings, assume video validation is successful
-        // In a real implementation, you would process the video here
-        const videoValidationResult = {
-          isValid: true,
-          confidence: 0.95,
-          errors: []
-        };
-        
-        // Prepare video data to store in verifiedDocument
-        const videoData = {
-          faceRecordingUrl: newData.faceRecordingUrl,
-          videoUrl: newData.videoUrl,
-          filename: newData.filename
-        };
-        
-        // Route to appropriate video completion function based on document type
-        if (normalizedType === 'Passport') {
-          // Import and call passport video processing function
-          const { completePassportWithVideo } = require('./verifyPassportDocument');
-          
-          const result = await completePassportWithVideo(newData.userId, normalizedType, videoValidationResult, videoData);
-          logInfo(`Passport video validation completed for user ${newData.userId}`, {
-            success: result.success,
-            finalStatus: result.finalStatus,
-            documentId: result.documentId,
-            videoDataStored: {
-              hasFaceRecordingUrl: !!videoData.faceRecordingUrl,
-              hasVideoUrl: !!videoData.videoUrl,
-              filename: videoData.filename
-            }
-          });
-        } else {
-          // Import and call ID document video processing function
-          const { completeDocumentWithVideo } = require('./verifyIDDocument');
-          
-          const result = await completeDocumentWithVideo(newData.userId, normalizedType, videoValidationResult, videoData);
-          logInfo(`ID document video validation completed for user ${newData.userId}`, {
-            success: result.success,
-            finalStatus: result.finalStatus,
-            documentId: result.documentId,
-            videoDataStored: {
-              hasFaceRecordingUrl: !!videoData.faceRecordingUrl,
-              hasVideoUrl: !!videoData.videoUrl,
-              filename: videoData.filename
-            }
-          });
-        }
-        
-      } catch (videoError) {
-        logError(`Error processing video validation for user ${newData.userId}:`, {
-          error: videoError.message,
-          stack: videoError.stack
-        });
-      }
-      
-      return;
-    }
-    
     // Debug character codes to detect hidden characters
     const charCodes = documentType ? Array.from(documentType).map(char => char.charCodeAt(0)) : [];
     logInfo(`Document type character analysis:`, {
@@ -123,7 +67,11 @@ const processUploadedDocument = onDocumentCreated("uploadedDocument/{docId}", as
       trimmedLength: documentType?.trim()?.length
     });
     
-    if (normalizedType === 'Traditional ID' || normalizedType === 'New ID') {
+    // Route to appropriate handler based on document type
+    if (normalizedType === 'selfie') {
+      logInfo(`Routing to selfie face matching for user: ${userId}`);
+      await processSelfieDocument(docId, newData);
+    } else if (normalizedType === 'Traditional ID' || normalizedType === 'New ID') {
       logInfo(`Routing to ID processing for type: ${normalizedType}`);
       await processIDDocument(docId, newData);
     } else if (normalizedType === 'Passport') {
@@ -136,7 +84,7 @@ const processUploadedDocument = onDocumentCreated("uploadedDocument/{docId}", as
         typeOf: typeof documentType,
         length: documentType?.length,
         charCodes,
-        expectedTypes: ['Traditional ID', 'New ID', 'Passport']
+        expectedTypes: ['Traditional ID', 'New ID', 'Passport', 'selfie']
       });
       return;
     }

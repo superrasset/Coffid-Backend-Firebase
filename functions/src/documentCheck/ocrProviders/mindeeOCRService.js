@@ -599,8 +599,9 @@ class MindeeOCRService extends BaseOCRService {
       // Recto validation: require basic personal information
       return !!(extractedData?.surname && extractedData?.givenNames?.length > 0 && extractedData?.birthDate);
     } else if (normalizedSide === 'verso') {
-      // Verso validation: require issue date and expiry date
-      return !!(extractedData?.issueDate && extractedData?.expiryDate);
+      // Verso validation: require at least issueDate or MRZ data (expiryDate optional)
+      // Traditional ID: expiryDate on verso, New ID: expiryDate on recto
+      return !!(extractedData?.issueDate || extractedData?.mrz1 || extractedData?.mrz2);
     } else {
       // For unknown side, require basic personal info
       return !!(extractedData?.surname && extractedData?.givenNames?.length > 0);
@@ -627,12 +628,10 @@ class MindeeOCRService extends BaseOCRService {
     }
     
     if (side === 'verso') {
-      if (!extractedData.issueDate) {
-        errors.push('Issue date not detected');
+      if (!extractedData.issueDate && !extractedData.mrz1 && !extractedData.mrz2) {
+        errors.push('Verso data incomplete: no issue date or MRZ detected');
       }
-      if (!extractedData.expiryDate) {
-        errors.push('Expiry date not detected');
-      }
+      // Note: expiryDate is optional for verso (Traditional ID has it on verso, New ID has it on recto)
     }
     
     return errors;

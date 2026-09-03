@@ -1,0 +1,28 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls",
+      "delegate_permission/common.get_login_creds"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.coffidapp",
+      "sha256_cert_fingerprints": [
+        "DF:09:8E:AD:A5:92:0C:71:A8:99:8B:45:60:1E:AC:B4:5E:3C:7E:96:2C:5E:4C:55:35:4C:77:1D:6E:D0:04:FA"
+      ]
+    }
+  },
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls",
+      "delegate_permission/common.get_login_creds"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.bluelocker.coffid",
+      "sha256_cert_fingerprints": [
+        "DA:64:30:0B:F2:EE:D9:B4:E4:34:08:42:6F:7B:8F:31:A2:40:84:7A:E0:32:6C:FF:CD:BF:2A:83:2E:F2:A0:14"
+      ]
+    }
+  }
+]

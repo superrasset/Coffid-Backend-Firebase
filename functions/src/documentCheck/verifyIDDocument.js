@@ -416,113 +416,6 @@ async function updateVerifiedDocumentForID(userId, side, verificationResult, db,
 }
 
 /**
- * Complete document verification after video validation
- * Updates status from "partial 2/3" to "completed"
- */
-async function completeDocumentWithVideo(userId, documentType, videoValidationResult, videoData = {}) {
-  try {
-    const db = getFirestore();
-    
-    logInfo(`Starting video validation completion for user ${userId}`, {
-      documentType,
-      videoValid: videoValidationResult.isValid,
-      hasVideoData: Object.keys(videoData).length > 0
-    });
-
-    // Find the document with status "partial 2/3" for this user and document type
-    const querySnapshot = await db.collection('verifiedDocument')
-      .where('userId', '==', userId)
-      .where('documentType', '==', documentType)
-      .where('status', '==', 'partial 2/3')
-      .orderBy('createdAt', 'desc')
-      .limit(1)
-      .get();
-
-    if (querySnapshot.empty) {
-      throw new Error(`No document found with status "partial 2/3" for user ${userId} and type ${documentType}`);
-    }
-
-    const verifiedDoc = querySnapshot.docs[0];
-    const verifiedDocRef = verifiedDoc.ref;
-    const existingData = verifiedDoc.data();
-
-    // Determine final status based on video validation
-    const finalStatus = videoValidationResult.isValid ? 'completed' : 'rejected';
-    
-    // Prepare video validation update
-    const videoValidationUpdate = {
-      isValid: videoValidationResult.isValid,
-      processedAt: new Date(),
-      confidence: videoValidationResult.confidence || 0,
-      errors: videoValidationResult.errors || []
-    };
-
-    // Add video reference if available
-    if (videoData.faceRecordingUrl) {
-      videoValidationUpdate.faceRecordingUrl = videoData.faceRecordingUrl;
-    }
-    if (videoData.videoUrl) {
-      videoValidationUpdate.videoUrl = videoData.videoUrl;
-    }
-    if (videoData.filename) {
-      videoValidationUpdate.filename = videoData.filename;
-    }
-    
-    // Update document with video validation results and final status
-    await verifiedDocRef.update({
-      status: finalStatus, // Final status: completed or rejected
-      'uploadedDocuments.videoValidation': videoValidationUpdate,
-      'uploadedDocuments.finalCompletedAt': new Date(),
-      'uploadedDocuments.finalValid': videoValidationResult.isValid && existingData.uploadedDocuments?.overallValid,
-      updatedAt: new Date()
-    });
-
-    // If video validation is successful and document is completed, update user data
-    if (videoValidationResult.isValid && finalStatus === 'completed') {
-      try {
-        const userUpdateResult = await updateUserDataFromVerifiedDocument(userId, existingData, db);
-        logInfo(`User data update completed for user ${userId}`, {
-          documentId: verifiedDoc.id,
-          updatedFields: userUpdateResult.updatedFields,
-          success: userUpdateResult.success
-        });
-      } catch (userUpdateError) {
-        // Log error but don't fail the entire operation
-        logError(`Failed to update user data for user ${userId}, but document processing completed:`, {
-          error: userUpdateError.message,
-          documentId: verifiedDoc.id,
-          finalStatus: finalStatus
-        });
-      }
-    }
-
-    logInfo(`Document verification completed with video validation for user ${userId}`, {
-      documentId: verifiedDoc.id,
-      finalStatus: finalStatus,
-      videoValid: videoValidationResult.isValid,
-      overallValid: existingData.uploadedDocuments?.overallValid,
-      finalValid: videoValidationResult.isValid && existingData.uploadedDocuments?.overallValid
-    });
-
-    return {
-      success: true,
-      documentId: verifiedDoc.id,
-      finalStatus: finalStatus,
-      finalValid: videoValidationResult.isValid && existingData.uploadedDocuments?.overallValid
-    };
-
-  } catch (error) {
-    logError(`Error completing document with video validation for user ${userId}:`, {
-      error: error.message,
-      stack: error.stack,
-      userId,
-      documentType
-    });
-    throw error;
-  }
-}
-
-/**
  * Helper function to extract document-level fields from OCR extracted data
  * @param {Object} extractedData - The extracted data from OCR
  * @returns {Object} - Document-level fields for aggregation
@@ -615,7 +508,16 @@ async function updateUserDataFromVerifiedDocument(userId, verifiedDocData, db) {
     // Update firstname if available
     if (verifiedDocData.firstname) {
       const existingUser = userDoc.exists ? userDoc.data() : {};
-      const existingFirstnames = existingUser.firstname || [];
+      let existingFirstnames = existingUser.firstname || [];
+      
+      // ⚠️ VALIDATION: Ensure existingFirstnames is an array of objects, not characters
+      if (existingFirstnames.length > 0 && typeof existingFirstnames[0] === 'string') {
+        logError(`Corrupted firstname data detected for user ${userId} - resetting`, {
+          corruptedData: existingFirstnames,
+          userId
+        });
+        existingFirstnames = [];
+      }
       
       // Add new firstname entry
       const newFirstnameEntry = createFieldEntry(verifiedDocData.firstname);
@@ -625,7 +527,16 @@ async function updateUserDataFromVerifiedDocument(userId, verifiedDocData, db) {
     // Update lastname if available
     if (verifiedDocData.lastname) {
       const existingUser = userDoc.exists ? userDoc.data() : {};
-      const existingLastnames = existingUser.lastname || [];
+      let existingLastnames = existingUser.lastname || [];
+      
+      // ⚠️ VALIDATION: Ensure existingLastnames is an array of objects, not characters
+      if (existingLastnames.length > 0 && typeof existingLastnames[0] === 'string') {
+        logError(`Corrupted lastname data detected for user ${userId} - resetting`, {
+          corruptedData: existingLastnames,
+          userId
+        });
+        existingLastnames = [];
+      }
       
       // Add new lastname entry
       const newLastnameEntry = createFieldEntry(verifiedDocData.lastname);
@@ -635,7 +546,17 @@ async function updateUserDataFromVerifiedDocument(userId, verifiedDocData, db) {
     // Update birthDate if available
     if (verifiedDocData.birthDate) {
       const existingUser = userDoc.exists ? userDoc.data() : {};
-      const existingBirthDates = existingUser.birthDate || [];
+      let existingBirthDates = existingUser.birthDate || [];
+      
+      // ⚠️ VALIDATION: Ensure existingBirthDates is an array of objects, not characters
+      // If corrupted data exists (array of strings), reset it
+      if (existingBirthDates.length > 0 && typeof existingBirthDates[0] === 'string') {
+        logError(`Corrupted birthDate data detected for user ${userId} - resetting`, {
+          corruptedData: existingBirthDates,
+          userId
+        });
+        existingBirthDates = []; // Reset to empty array
+      }
       
       // Add new birthDate entry
       const newBirthDateEntry = createFieldEntry(verifiedDocData.birthDate);
@@ -646,6 +567,7 @@ async function updateUserDataFromVerifiedDocument(userId, verifiedDocData, db) {
     if (Object.keys(updateData).length > 0) {
       // Add metadata
       updateData.updatedAt = currentTime;
+      updateData.dataStatus = 'validated';
       if (!userDoc.exists) {
         updateData.createdAt = currentTime;
       }
@@ -693,6 +615,5 @@ module.exports = {
   processIDDocument,
   verifyIDSide,
   updateVerifiedDocumentForID,
-  completeDocumentWithVideo,
   updateUserDataFromVerifiedDocument
 };

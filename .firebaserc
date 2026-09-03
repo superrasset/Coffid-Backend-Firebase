@@ -2,6 +2,8 @@
   "projects": {
     "coffid": "coffid-2388b",
     "default": "coffid-2388b",
+    "dev": "coffid-dev",
+    "prod": "coffid-2388b",
     "q": "coffid-2388b"
   },
   "targets": {

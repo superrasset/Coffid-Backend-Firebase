@@ -160,6 +160,15 @@ const generateQrCode = onRequest({ cors: true }, async (req, res) => {
             display_name
         });
 
+        // Debug: vérifier les valeurs exactes
+        console.log('🔍 Debug display_name:', {
+            display_name_value: display_name,
+            display_name_type: typeof display_name,
+            display_name_length: display_name ? display_name.length : 0,
+            is_truthy: !!display_name,
+            will_use: display_name || organization_name || 'Unknown Client'
+        });
+
         const pendingRequest = await getFirestore()
         .collection("pendingRequest")
         

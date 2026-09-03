@@ -811,17 +811,20 @@ class MindeeOCRServiceV2 extends BaseOCRService {
             isValid = false;
           }
         } else if (side === 'verso') {
-          // Verso validation - require validity dates (MRZ is optional since V2 may not provide it)
-          if (!extractedData.issueDate) {
-            errors.push('Missing issue date on verso');
+          // Verso validation - lenient validation (MRZ or dates)
+          // Traditional ID: expiryDate on verso, New ID: expiryDate on recto
+          // Accept verso if it has issueDate OR MRZ data (expiryDate is optional)
+          const hasValidVersoData = !!(
+            extractedData.issueDate || 
+            extractedData.mrz1 || 
+            extractedData.mrz2
+          );
+          
+          if (!hasValidVersoData) {
+            errors.push('Verso data incomplete: no issue date or MRZ detected');
             isValid = false;
           }
-          if (!extractedData.expiryDate) {
-            errors.push('Missing expiry date on verso');
-            isValid = false;
-          }
-          // MRZ fields are optional - Mindee V2 may not provide them for French ID cards
-          // This is acceptable as the important data is extracted from other fields
+          // Note: expiryDate is optional for verso validation
         }
       } else if (documentType === 'Passport') {
         // Passport validation
