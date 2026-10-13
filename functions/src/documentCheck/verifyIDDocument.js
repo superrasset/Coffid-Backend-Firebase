@@ -424,8 +424,9 @@ function extractDocumentLevelFields(extractedData) {
   if (!extractedData) return {};
   
   return {
+    documentNumber: extractedData.documentNumber || null,
     cardNumber: extractedData.cardAccessNumber || null,
-    firstname: Array.isArray(extractedData.givenNames) && extractedData.givenNames.length > 0 
+    firstname: Array.isArray(extractedData.givenNames) && extractedData.givenNames.length > 0
       ? extractedData.givenNames[0].split(/[\s,]+/)[0] : null,
     lastname: extractedData.surname || null,
     birthDate: extractedData.birthDate || null,
@@ -480,6 +481,79 @@ function createDocumentLevelUpdateFields(extractedData, existingData = {}, side 
  * @param {Object} verifiedDocData - The verified document data
  * @param {Object} db - Firestore database instance
  */
+async function updatePendingRequestFromVerifiedDocument(taskId, verifiedDocData, db) {
+  try {
+    // Read infoRequired from pendingRequest to filter result to what the client asked for
+    const pendingDoc = await db.collection('pendingRequest').doc(taskId).get();
+    const infoRequired = pendingDoc.exists ? (pendingDoc.data().infoRequired || []) : [];
+
+    logInfo(`Updating pendingRequest ${taskId} from verified document`, {
+      documentType: verifiedDocData.documentType,
+      infoRequired,
+    });
+
+    const result = { verificationMethod: 'ocr' };
+
+    const computeAge = (birthDateStr) => {
+      if (!birthDateStr) return null;
+      const birth = new Date(birthDateStr);
+      if (isNaN(birth.getTime())) return null;
+      const now = new Date();
+      return now.getFullYear() - birth.getFullYear()
+        - (now < new Date(now.getFullYear(), birth.getMonth(), birth.getDate()) ? 1 : 0);
+    };
+    const isAgeOver = (birthDateStr, minAge) => {
+      const age = computeAge(birthDateStr);
+      return age !== null ? age >= minAge : null;
+    };
+
+    for (const field of infoRequired) {
+      if (field === 'firstname' && verifiedDocData.firstname) {
+        result.firstname = verifiedDocData.firstname;
+      } else if (field === 'lastname' && verifiedDocData.lastname) {
+        result.lastname = verifiedDocData.lastname;
+      } else if (field === 'birthdate' && verifiedDocData.birthDate) {
+        result.birthDate = verifiedDocData.birthDate;
+      } else if (field === 'age' && verifiedDocData.birthDate) {
+        const computedAge = computeAge(verifiedDocData.birthDate);
+        if (computedAge !== null) result.age = computedAge;
+      } else if (field === 'nationality' && verifiedDocData.nationality) {
+        result.nationality = verifiedDocData.nationality;
+      } else if ((field === 'sex' || field === 'gender') && verifiedDocData.sex) {
+        result.sex = verifiedDocData.sex;
+      } else if (field === 'majority' || field === 'age_over_18') {
+        const over18 = isAgeOver(verifiedDocData.birthDate, 18);
+        if (over18 !== null) result.majority = over18;
+      } else if (field === 'age_over_21') {
+        const over21 = isAgeOver(verifiedDocData.birthDate, 21);
+        if (over21 !== null) result.age_over_21 = over21;
+      }
+    }
+
+    if (verifiedDocData.documentType) result.documentType = verifiedDocData.documentType;
+
+    await db.collection('pendingRequest').doc(taskId).update({
+      status: 'completed',
+      verificationMethod: 'ocr',
+      result,
+      completedAt: new Date(),
+    });
+
+    logInfo(`pendingRequest ${taskId} marked as completed`, { result });
+
+    return { success: true, result };
+
+  } catch (error) {
+    logError(`Error updating pendingRequest ${taskId}:`, {
+      error: error.message,
+      stack: error.stack,
+      taskId,
+      documentType: verifiedDocData.documentType
+    });
+    throw error;
+  }
+}
+
 async function updateUserDataFromVerifiedDocument(userId, verifiedDocData, db) {
   try {
     logInfo(`Updating user data for user ${userId} from verified document`, {
@@ -491,121 +565,46 @@ async function updateUserDataFromVerifiedDocument(userId, verifiedDocData, db) {
 
     const userRef = db.collection('users').doc(userId);
     const userDoc = await userRef.get();
-    
     const currentTime = new Date();
-    const origin = verifiedDocData.documentType; // e.g., "Traditional ID", "New ID"
-    
-    // Prepare the update data structure
+    const origin = verifiedDocData.documentType;
     const updateData = {};
-    
-    // Helper function to create field entry
-    const createFieldEntry = (value) => ({
-      value: value,
-      origin: origin,
-      updatedAt: currentTime
-    });
-    
-    // Update firstname if available
+
+    const createFieldEntry = (value) => ({ value, origin, updatedAt: currentTime });
+
     if (verifiedDocData.firstname) {
       const existingUser = userDoc.exists ? userDoc.data() : {};
       let existingFirstnames = existingUser.firstname || [];
-      
-      // ⚠️ VALIDATION: Ensure existingFirstnames is an array of objects, not characters
-      if (existingFirstnames.length > 0 && typeof existingFirstnames[0] === 'string') {
-        logError(`Corrupted firstname data detected for user ${userId} - resetting`, {
-          corruptedData: existingFirstnames,
-          userId
-        });
-        existingFirstnames = [];
-      }
-      
-      // Add new firstname entry
-      const newFirstnameEntry = createFieldEntry(verifiedDocData.firstname);
-      updateData.firstname = [...existingFirstnames, newFirstnameEntry];
+      if (existingFirstnames.length > 0 && typeof existingFirstnames[0] === 'string') existingFirstnames = [];
+      updateData.firstname = [...existingFirstnames, createFieldEntry(verifiedDocData.firstname)];
     }
-    
-    // Update lastname if available
+
     if (verifiedDocData.lastname) {
       const existingUser = userDoc.exists ? userDoc.data() : {};
       let existingLastnames = existingUser.lastname || [];
-      
-      // ⚠️ VALIDATION: Ensure existingLastnames is an array of objects, not characters
-      if (existingLastnames.length > 0 && typeof existingLastnames[0] === 'string') {
-        logError(`Corrupted lastname data detected for user ${userId} - resetting`, {
-          corruptedData: existingLastnames,
-          userId
-        });
-        existingLastnames = [];
-      }
-      
-      // Add new lastname entry
-      const newLastnameEntry = createFieldEntry(verifiedDocData.lastname);
-      updateData.lastname = [...existingLastnames, newLastnameEntry];
+      if (existingLastnames.length > 0 && typeof existingLastnames[0] === 'string') existingLastnames = [];
+      updateData.lastname = [...existingLastnames, createFieldEntry(verifiedDocData.lastname)];
     }
-    
-    // Update birthDate if available
+
     if (verifiedDocData.birthDate) {
       const existingUser = userDoc.exists ? userDoc.data() : {};
       let existingBirthDates = existingUser.birthDate || [];
-      
-      // ⚠️ VALIDATION: Ensure existingBirthDates is an array of objects, not characters
-      // If corrupted data exists (array of strings), reset it
-      if (existingBirthDates.length > 0 && typeof existingBirthDates[0] === 'string') {
-        logError(`Corrupted birthDate data detected for user ${userId} - resetting`, {
-          corruptedData: existingBirthDates,
-          userId
-        });
-        existingBirthDates = []; // Reset to empty array
-      }
-      
-      // Add new birthDate entry
-      const newBirthDateEntry = createFieldEntry(verifiedDocData.birthDate);
-      updateData.birthDate = [...existingBirthDates, newBirthDateEntry];
+      if (existingBirthDates.length > 0 && typeof existingBirthDates[0] === 'string') existingBirthDates = [];
+      updateData.birthDate = [...existingBirthDates, createFieldEntry(verifiedDocData.birthDate)];
     }
-    
-    // Only update if we have data to update
+
     if (Object.keys(updateData).length > 0) {
-      // Add metadata
       updateData.updatedAt = currentTime;
       updateData.dataStatus = 'validated';
-      if (!userDoc.exists) {
-        updateData.createdAt = currentTime;
-      }
-      
-      // Update or create user document
+      if (!userDoc.exists) updateData.createdAt = currentTime;
       await userRef.set(updateData, { merge: true });
-      
-      logInfo(`Successfully updated user data for user ${userId}`, {
-        updatedFields: Object.keys(updateData),
-        origin: origin,
-        firstname: verifiedDocData.firstname,
-        lastname: verifiedDocData.lastname,
-        birthDate: verifiedDocData.birthDate
-      });
-      
-      return {
-        success: true,
-        updatedFields: Object.keys(updateData).filter(key => key !== 'updatedAt' && key !== 'createdAt')
-      };
-    } else {
-      logInfo(`No user data to update for user ${userId} - all required fields missing`, {
-        documentType: verifiedDocData.documentType
-      });
-      
-      return {
-        success: true,
-        updatedFields: [],
-        reason: 'No valid data fields to update'
-      };
+      logInfo(`Successfully updated user data for user ${userId}`, { updatedFields: Object.keys(updateData) });
+      return { success: true, updatedFields: Object.keys(updateData).filter(k => k !== 'updatedAt' && k !== 'createdAt') };
     }
-    
+
+    return { success: true, updatedFields: [] };
+
   } catch (error) {
-    logError(`Error updating user data for user ${userId}:`, {
-      error: error.message,
-      stack: error.stack,
-      userId,
-      documentType: verifiedDocData.documentType
-    });
+    logError(`Error updating user data for user ${userId}:`, { error: error.message, stack: error.stack });
     throw error;
   }
 }
@@ -615,5 +614,6 @@ module.exports = {
   processIDDocument,
   verifyIDSide,
   updateVerifiedDocumentForID,
+  updatePendingRequestFromVerifiedDocument,
   updateUserDataFromVerifiedDocument
 };

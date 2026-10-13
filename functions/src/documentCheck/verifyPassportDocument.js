@@ -184,6 +184,8 @@ async function createVerifiedPassportDocument(userId, verificationResult, db) {
       freshDocument: true
     });
 
+    return { documentId: verifiedDocRef.id };
+
   } catch (error) {
     logError(`Error creating verified passport document for user ${userId}:`, {
       error: error.message,

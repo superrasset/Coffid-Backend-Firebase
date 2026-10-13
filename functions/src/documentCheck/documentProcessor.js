@@ -1,24 +1,26 @@
 const {onDocumentCreated} = require("firebase-functions/v2/firestore");
 const {info: logInfo, error: logError} = require("firebase-functions/logger");
 const {defineSecret} = require("firebase-functions/params");
-const { processIDDocument } = require('./verifyIDDocument');
-const { processPassportDocument } = require('./verifyPassportDocument');
+const { processLLMIDDocument, processLLMPassportDocument } = require('./processLLMDocument');
 const { processSelfieDocument } = require('../faceMatching/verifySelfieDocument');
 const { awsAccessKeyId, awsSecretAccessKey } = require('../faceMatching/awsRekognitionService');
 
-// Define secrets for sensitive credentials
+// Mindee secret kept for reference — Mindee handlers are no longer routed but preserved in:
+// verifyIDDocument.js / verifyPassportDocument.js / ocrServiceV2.js
 const mindeeApiKey = defineSecret("MINDEE_API_KEY");
 
 /**
  * Firestore trigger that processes newly uploaded documents
  * Routes documents to appropriate verification handlers based on documentType only
- * Uses AWS Rekognition for selfie face matching and Mindee for document OCR
- * Requires secrets: AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, MINDEE_API_KEY
+ * Uses Gemini (Vertex AI) via Genkit for document OCR, AWS Rekognition for selfie face matching
+ * Requires secrets: AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY
  */
 const processUploadedDocument = onDocumentCreated(
   {
     document: "uploadedDocument/{docId}",
-    secrets: [awsAccessKeyId, awsSecretAccessKey, mindeeApiKey]
+    secrets: [awsAccessKeyId, awsSecretAccessKey],
+    timeoutSeconds: 300,
+    memory: "512MiB",
   },
   async (event) => {
   const docId = event.params.docId;
@@ -71,12 +73,12 @@ const processUploadedDocument = onDocumentCreated(
     if (normalizedType === 'selfie') {
       logInfo(`Routing to selfie face matching for user: ${userId}`);
       await processSelfieDocument(docId, newData);
-    } else if (normalizedType === 'Traditional ID' || normalizedType === 'New ID') {
-      logInfo(`Routing to ID processing for type: ${normalizedType}`);
-      await processIDDocument(docId, newData);
+    } else if (normalizedType === 'ID' || normalizedType === 'Traditional ID' || normalizedType === 'New ID') {
+      logInfo(`Routing to LLM ID processing for type: ${normalizedType}`);
+      await processLLMIDDocument(docId, newData);
     } else if (normalizedType === 'Passport') {
-      logInfo(`Routing to passport processing for type: ${normalizedType}`);
-      await processPassportDocument(docId, newData);
+      logInfo(`Routing to LLM Passport processing`);
+      await processLLMPassportDocument(docId, newData);
     } else {
       logError(`Unknown document type: ${documentType}`, {
         receivedType: documentType,
@@ -84,7 +86,7 @@ const processUploadedDocument = onDocumentCreated(
         typeOf: typeof documentType,
         length: documentType?.length,
         charCodes,
-        expectedTypes: ['Traditional ID', 'New ID', 'Passport', 'selfie']
+        expectedTypes: ['ID', 'Traditional ID', 'New ID', 'Passport', 'selfie']
       });
       return;
     }
