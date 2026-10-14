@@ -96,42 +96,31 @@ const generateQrCode = onRequest({ cors: true }, async (req, res) => {
         });
     }
 
+    if (req.method !== 'POST') {
+        return res.status(405).json({ error: 'Method not allowed. Use POST.' });
+    }
+
     try {
         const VALID_INFO_TYPES = new Set(['majority', 'firstname', 'lastname', 'age', 'birthdate', 'nationality', 'sex', 'gender']);
         const isValidField = (f) => VALID_INFO_TYPES.has(f) || /^age_over_\d+$/.test(f);
+        const isValidHttpsUrl = (value) => {
+            try { return new URL(value).protocol === 'https:'; } catch { return false; }
+        };
 
-        const queryParam = req.query.q;
+        const body = req.body || {};
 
-        if (!queryParam) {
+        // Parse q: accept array or string (comma-separated)
+        const rawQ = body.q;
+        if (!rawQ) {
             return res.status(400).json({
-                error: 'Missing required parameter: q',
+                error: 'Missing required field: q',
                 valid_fields: [...VALID_INFO_TYPES, 'age_over_<n>'],
             });
         }
+        const infoRequired = Array.isArray(rawQ)
+            ? rawQ.map(f => f.trim()).filter(Boolean)
+            : String(rawQ).split(',').map(f => f.trim()).filter(Boolean);
 
-        // Parse q: comma-separated, ampersand-separated within q, or single value
-        let infoRequired = [];
-        if (queryParam.includes(',')) {
-            infoRequired = queryParam.split(',').map(item => item.trim()).filter(Boolean);
-        } else if (queryParam.includes('&')) {
-            infoRequired = queryParam.split('&').map(item => item.trim()).filter(Boolean);
-        } else {
-            infoRequired = [queryParam.trim()];
-        }
-
-        // Also pick up known fields passed as standalone query params (e.g. ?majority&firstname)
-        for (const f of VALID_INFO_TYPES) {
-            if (req.query[f] !== undefined && !infoRequired.includes(f)) {
-                infoRequired.push(f);
-            }
-        }
-        for (const key of Object.keys(req.query)) {
-            if (/^age_over_\d+$/.test(key) && !infoRequired.includes(key)) {
-                infoRequired.push(key);
-            }
-        }
-
-        // Validate every field against the whitelist
         const unknownFields = infoRequired.filter(f => !isValidField(f));
         if (unknownFields.length > 0) {
             return res.status(400).json({
@@ -145,6 +134,17 @@ const generateQrCode = onRequest({ cors: true }, async (req, res) => {
                 error: 'No valid fields provided.',
                 valid_fields: [...VALID_INFO_TYPES, 'age_over_<n>'],
             });
+        }
+
+        // Validate optional redirect URLs
+        const redirectSuccess = body.redirect_success || null;
+        const redirectError   = body.redirect_error   || null;
+
+        if (redirectSuccess && !isValidHttpsUrl(redirectSuccess)) {
+            return res.status(400).json({ error: 'Invalid redirect_success: must be a valid https URL.' });
+        }
+        if (redirectError && !isValidHttpsUrl(redirectError)) {
+            return res.status(400).json({ error: 'Invalid redirect_error: must be a valid https URL.' });
         }
 
         console.log('Processing request for info:', infoRequired);
@@ -187,6 +187,8 @@ const generateQrCode = onRequest({ cors: true }, async (req, res) => {
           clientKeyId: key_id,
           clientOrganizationId: organization_id || null,
           infoRequired: infoRequired,
+          redirectSuccess: redirectSuccess,
+          redirectError: redirectError,
           status: 'pending',
           createdAt: new Date(),
           result: null,
@@ -194,26 +196,8 @@ const generateQrCode = onRequest({ cors: true }, async (req, res) => {
           userResponseUpdatedAt: null,
         });
 
-        let qrOutput;
-        let contentType;
-
-        // Generate QR code URL
+        // Generate QR code URL (deep link, text format)
         const qrCodeText = 'https://api.coffid.com/identity-check/' + pendingRequest.id;
-        
-        // TODO: Get format from request parameter
-        let qrFormat = 'text';
-
-        switch (qrFormat.toLowerCase()) {
-          case 'svg':
-              qrOutput = await qrcode.toString(qrCodeText, { type: 'svg' });
-              contentType = 'image/svg+xml';
-              break;
-
-          case 'text':
-          default:
-                qrOutput = qrCodeText;
-                contentType = 'application/json';
-        }
         
         // Log l'usage de l'API de manière asynchrone et non-bloquante
         if (customer_id && client_id) {
@@ -234,17 +218,13 @@ const generateQrCode = onRequest({ cors: true }, async (req, res) => {
             console.warn('Skipping usage logging - missing customer_id or client_id');
         }
 
-        // Send the QR code back in the appropriate format
-        if (contentType === 'application/json') {
-            res.status(200).json({ 
-              deep_link: qrOutput,
-              task_id: pendingRequest.id,
-              infoRequired: infoRequired // Include the parsed array of requirements
-            });
-        } else {
-            res.setHeader('Content-Type', contentType);
-            res.status(200).send(qrOutput);
-        }
+        res.status(200).json({
+            deep_link: qrCodeText,
+            task_id: pendingRequest.id,
+            infoRequired: infoRequired,
+            ...(redirectSuccess && { redirect_success: redirectSuccess }),
+            ...(redirectError   && { redirect_error:   redirectError }),
+        });
 
     } catch (error) {
         // Log any errors and send a 500 Internal Server Error response

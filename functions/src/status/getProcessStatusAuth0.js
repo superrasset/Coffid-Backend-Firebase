@@ -73,6 +73,8 @@ const getProcessStatus = onRequest({ cors: true }, async (req, res) => {
             result: data.result || null,
             infoRequired: data.infoRequired || null,
             userResponseUpdatedAt: data.userResponseUpdatedAt || null,
+            redirect_success: data.redirectSuccess || null,
+            redirect_error: data.redirectError || null,
         });
 
     } catch (error) {
