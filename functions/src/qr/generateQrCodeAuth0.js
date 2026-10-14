@@ -97,51 +97,54 @@ const generateQrCode = onRequest({ cors: true }, async (req, res) => {
     }
 
     try {
-        // Get the info the client wants to access
+        const VALID_INFO_TYPES = new Set(['majority', 'firstname', 'lastname', 'age', 'birthdate', 'nationality', 'sex', 'gender']);
+        const isValidField = (f) => VALID_INFO_TYPES.has(f) || /^age_over_\d+$/.test(f);
+
         const queryParam = req.query.q;
-        
+
         if (!queryParam) {
-            // If no text is provided, return a 400 Bad Request error
-            return res.status(400).send('Please provide the data you want to check in the query parameter.');
+            return res.status(400).json({
+                error: 'Missing required parameter: q',
+                valid_fields: [...VALID_INFO_TYPES, 'age_over_<n>'],
+            });
         }
 
-        // Parse multiple infoRequired parameters
-        // Support multiple formats:
-        // 1. Ampersand-separated within q: ?q=majority&firstname (as a single parameter)
-        // 2. Multiple query parameters: ?q=majority&firstname (where firstname is a separate parameter)
-        // 3. Comma-separated: ?q=majority,firstname
+        // Parse q: comma-separated, ampersand-separated within q, or single value
         let infoRequired = [];
-        
-        // First, check if q parameter contains separators
-        if (queryParam.includes('&')) {
-            // Handle ampersand-separated values within q parameter (majority&firstname)
-            infoRequired = queryParam.split('&').map(item => item.trim()).filter(item => item.length > 0);
-        } else if (queryParam.includes(',')) {
-            // Handle comma-separated values (majority,firstname)
-            infoRequired = queryParam.split(',').map(item => item.trim()).filter(item => item.length > 0);
+        if (queryParam.includes(',')) {
+            infoRequired = queryParam.split(',').map(item => item.trim()).filter(Boolean);
+        } else if (queryParam.includes('&')) {
+            infoRequired = queryParam.split('&').map(item => item.trim()).filter(Boolean);
         } else {
-            // Single value in q parameter
             infoRequired = [queryParam.trim()];
         }
-        
-        // Also check for additional query parameters that might be info requirements
-        const possibleInfoTypes = ['firstname', 'lastname', 'age', 'majority', 'birthdate', 'nationality', 'sex', 'gender'];
 
-        for (const infoType of possibleInfoTypes) {
-            if (req.query[infoType] !== undefined && !infoRequired.includes(infoType)) {
-                infoRequired.push(infoType);
+        // Also pick up known fields passed as standalone query params (e.g. ?majority&firstname)
+        for (const f of VALID_INFO_TYPES) {
+            if (req.query[f] !== undefined && !infoRequired.includes(f)) {
+                infoRequired.push(f);
             }
         }
-
-        // Handle dynamic age_over_<digits> parameters (e.g. ?age_over_18, ?age_over_21)
         for (const key of Object.keys(req.query)) {
             if (/^age_over_\d+$/.test(key) && !infoRequired.includes(key)) {
                 infoRequired.push(key);
             }
         }
 
+        // Validate every field against the whitelist
+        const unknownFields = infoRequired.filter(f => !isValidField(f));
+        if (unknownFields.length > 0) {
+            return res.status(400).json({
+                error: 'Unknown field(s): ' + unknownFields.join(', '),
+                valid_fields: [...VALID_INFO_TYPES, 'age_over_<n>'],
+            });
+        }
+
         if (infoRequired.length === 0) {
-            return res.status(400).send('Please provide valid data to check in the query parameter.');
+            return res.status(400).json({
+                error: 'No valid fields provided.',
+                valid_fields: [...VALID_INFO_TYPES, 'age_over_<n>'],
+            });
         }
 
         console.log('Processing request for info:', infoRequired);
@@ -177,8 +180,6 @@ const generateQrCode = onRequest({ cors: true }, async (req, res) => {
 
         const pendingRequest = await getFirestore()
         .collection("pendingRequest")
-        
-        // TODO: Add switch case to validate input (majorité/age/genre/...)
         
         .add({
           clientRequester : display_name || organization_name || 'Unknown Client',  
