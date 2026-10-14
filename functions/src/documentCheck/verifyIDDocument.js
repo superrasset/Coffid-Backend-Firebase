@@ -521,12 +521,16 @@ async function updatePendingRequestFromVerifiedDocument(taskId, verifiedDocData,
         result.nationality = verifiedDocData.nationality;
       } else if ((field === 'sex' || field === 'gender') && verifiedDocData.sex) {
         result.sex = verifiedDocData.sex;
-      } else if (field === 'majority' || field === 'age_over_18') {
+      } else if (field === 'majority') {
         const over18 = isAgeOver(verifiedDocData.birthDate, 18);
         if (over18 !== null) result.majority = over18;
-      } else if (field === 'age_over_21') {
-        const over21 = isAgeOver(verifiedDocData.birthDate, 21);
-        if (over21 !== null) result.age_over_21 = over21;
+      } else {
+        const ageOverMatch = field.match(/^age_over_(\d+)$/);
+        if (ageOverMatch) {
+          const minAge = parseInt(ageOverMatch[1], 10);
+          const isOver = isAgeOver(verifiedDocData.birthDate, minAge);
+          if (isOver !== null) result[field] = isOver;
+        }
       }
     }
 

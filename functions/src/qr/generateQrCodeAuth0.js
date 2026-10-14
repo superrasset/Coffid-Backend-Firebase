@@ -125,12 +125,18 @@ const generateQrCode = onRequest({ cors: true }, async (req, res) => {
         }
         
         // Also check for additional query parameters that might be info requirements
-        // Common info types that might be requested
         const possibleInfoTypes = ['firstname', 'lastname', 'age', 'majority', 'birthdate', 'nationality', 'sex', 'gender'];
-        
+
         for (const infoType of possibleInfoTypes) {
             if (req.query[infoType] !== undefined && !infoRequired.includes(infoType)) {
                 infoRequired.push(infoType);
+            }
+        }
+
+        // Handle dynamic age_over_<digits> parameters (e.g. ?age_over_18, ?age_over_21)
+        for (const key of Object.keys(req.query)) {
+            if (/^age_over_\d+$/.test(key) && !infoRequired.includes(key)) {
+                infoRequired.push(key);
             }
         }
 
