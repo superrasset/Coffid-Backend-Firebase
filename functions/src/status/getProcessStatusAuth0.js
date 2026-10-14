@@ -31,11 +31,16 @@ const getProcessStatus = onRequest({ cors: true }, async (req, res) => {
     }
 
     const taskId = req.query.task_id;
-    console.log('Checking status for task_id:', taskId);
-    
+
     if (!taskId) {
-        return res.status(400).send('Missing "task_id" query parameter.');
+        return res.status(400).json({ error: 'Missing required parameter: task_id' });
     }
+
+    if (!/^[a-zA-Z0-9]{20}$/.test(taskId)) {
+        return res.status(400).json({ error: 'Invalid task_id format.' });
+    }
+
+    console.log('Checking status for task_id:', taskId);
 
     try {
         const db = getFirestore();
@@ -71,8 +76,8 @@ const getProcessStatus = onRequest({ cors: true }, async (req, res) => {
         });
 
     } catch (error) {
-      console.error('Error retrieving task status:', error);    
-      res.status(500).send('Error retrieving task status.');
+      console.error('Error retrieving task status:', error);
+      res.status(500).json({ error: 'Internal server error.' });
     }
 });
 
