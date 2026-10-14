@@ -49,14 +49,25 @@ const getProcessStatus = onRequest({ cors: true }, async (req, res) => {
         }
 
         const data = taskDoc.data();
-        
-        // Return only the necessary public information
+
+        // Ownership check — pivot: key_id
+        const callerKeyId = req.authContext.key_id;
+        if (data.clientKeyId) {
+            if (data.clientKeyId !== callerKeyId) {
+                console.warn('Ownership mismatch on task', taskId, { callerKeyId, owner: data.clientKeyId });
+                return res.status(403).json({ error: 'Forbidden: this task belongs to a different API key.' });
+            }
+        } else {
+            // Legacy task without clientKeyId — allow but log
+            console.warn('Task', taskId, 'has no clientKeyId (legacy), skipping ownership check');
+        }
+
         res.status(200).json({
             task_id: taskId,
             status: data.status,
-            result: data.result || null, // Only return result if available
-            infoRequired: data.infoRequired || null, // Include infoRequired if needed
-            userResponseUpdatedAt: data.userResponseUpdatedAt || null, // Include userResponseUpdatedAt if needed
+            result: data.result || null,
+            infoRequired: data.infoRequired || null,
+            userResponseUpdatedAt: data.userResponseUpdatedAt || null,
         });
 
     } catch (error) {

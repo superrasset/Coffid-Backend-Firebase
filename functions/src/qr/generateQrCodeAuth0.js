@@ -157,6 +157,7 @@ const generateQrCode = onRequest({ cors: true }, async (req, res) => {
             organization_name,
             display_name,
             client_id,
+            key_id,
             method
         } = req.authContext;
         
@@ -182,13 +183,15 @@ const generateQrCode = onRequest({ cors: true }, async (req, res) => {
         .collection("pendingRequest")
         
         .add({
-          clientRequester : display_name || organization_name || 'Unknown Client',  
-          infoRequired: infoRequired, // Now stores an array of required information
-          status : 'pending',
-          createdAt : new Date(),
+          clientRequester: display_name || organization_name || 'Unknown Client',
+          clientKeyId: key_id,
+          clientOrganizationId: organization_id || null,
+          infoRequired: infoRequired,
+          status: 'pending',
+          createdAt: new Date(),
           result: null,
           userId: null,
-          userResponseUpdatedAt: null
+          userResponseUpdatedAt: null,
         });
 
         let qrOutput;
