@@ -1,29 +1,9 @@
-const { auth } = require('express-oauth2-jwt-bearer');
 const { getFirestore } = require('firebase-admin/firestore');
 const crypto = require('crypto');
 
-// Configuration Auth0 pour la validation JWT
-const jwtCheck = auth({
-  audience: 'https://coffid.com/api',
-  issuerBaseURL: 'https://bluelocker.eu.auth0.com/',
-  tokenSigningAlg: 'RS256'
-});
-
-/**
- * Middleware d'authentification unifié
- * Supporte Auth0 JWT (Bearer token) OU API Key (X-API-Key header)
- * 
- * Peuple req.authContext avec les métadonnées du client :
- * - method: 'auth0' | 'apikey'
- * - customer_id, subscription_id, organization_id, organization_name, display_name
- * - client_id (pour le logging)
- * - scopes: array de permissions
- * - metadata: infos additionnelles
- */
 async function authenticateRequest(req, res) {
   return new Promise(async (resolve, reject) => {
     try {
-      // 1. Vérifier si c'est une API Key
       const apiKey = req.headers['x-api-key'];
       if (apiKey) {
         const result = await validateApiKey(req, apiKey);
@@ -37,56 +17,7 @@ async function authenticateRequest(req, res) {
         return;
       }
 
-      // 2. Vérifier si c'est un token Auth0
-      const authHeader = req.headers['authorization'];
-      if (authHeader && authHeader.startsWith('Bearer ')) {
-        try {
-          await new Promise((resolveJWT, rejectJWT) => {
-            jwtCheck(req, res, (err) => {
-              if (err) rejectJWT(err);
-              else resolveJWT();
-            });
-          });
-
-          // Extraire les métadonnées depuis le token Auth0
-          const authToken = req.auth;
-          if (!authToken) {
-            res.status(403).json({ error: 'No auth token found' });
-            reject(new Error('No auth token found'));
-            return;
-          }
-
-          // Extraire les scopes
-          let scopes = [];
-          if (authToken.payload && authToken.payload.scope) {
-            scopes = authToken.payload.scope.split(' ');
-          }
-
-          // Peupler authContext
-          req.authContext = {
-            method: 'auth0',
-            customer_id: authToken.payload["https://coffid.com/stripe_customer_id"],
-            subscription_id: authToken.payload["https://coffid.com/stripe_subscription_id"],
-            organization_id: authToken.payload["https://coffid.com/organization_id"],
-            organization_name: authToken.payload["https://coffid.com/organization_name"],
-            display_name: authToken.payload["https://coffid.com/display_name"],
-            client_id: authToken.payload.aud,
-            scopes: scopes,
-            metadata: {}
-          };
-
-          resolve();
-          return;
-        } catch (error) {
-          console.error('Auth0 JWT validation failed:', error);
-          res.status(401).json({ error: 'Unauthorized' });
-          reject(error);
-          return;
-        }
-      }
-
-      // 3. Aucune authentification fournie
-      res.status(401).json({ error: 'Authentication required. Provide X-API-Key header or Authorization Bearer token.' });
+      res.status(401).json({ error: 'Authentication required. Provide an X-API-Key header.' });
       reject(new Error('No authentication provided'));
     } catch (error) {
       console.error('Authentication error:', error);

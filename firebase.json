@@ -106,10 +106,6 @@
         "function": "getProcessStatus" 
       },
       {
-        "source": "/api/token",
-        "function": "getToken"
-      },
-      {
         "source": "/api/vp/init",
         "function": "initVP"
       },
