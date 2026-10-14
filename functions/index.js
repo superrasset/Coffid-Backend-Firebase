@@ -14,6 +14,10 @@ const { processPassportVerification } = require('./src/documentCheck/verifyPassp
 const { processUploadedDocument } = require('./src/documentCheck/documentProcessor');
 const processVideoValidation = require('./src/video/processVideoValidation');
 const { storeApiKey, revokeApiKey } = require('./src/apiKeys/manageApiKeys');
+const getVPRequestObject = require('./src/eudiWallet/getVPRequestObject');
+const handleVPResponse = require('./src/eudiWallet/handleVPResponse');
+const initVP = require('./src/eudiWallet/initVP');
+const verifyVP = require('./src/eudiWallet/verifyVP');
 
 // Export all functions
 exports.generateQrCode = generateQrCode;
@@ -25,6 +29,10 @@ exports.processUploadedDocument = processUploadedDocument;
 exports.processVideoValidation = processVideoValidation;
 exports.storeApiKey = storeApiKey;
 exports.revokeApiKey = revokeApiKey;
+exports.getVPRequestObject = getVPRequestObject;
+exports.handleVPResponse = handleVPResponse;
+exports.initVP = initVP;
+exports.verifyVP = verifyVP;
 
 // -----------------------------------------------------------------------------------------------------------
 // ---------------------------------------------API ENDPOINTS-------------------------------------------------

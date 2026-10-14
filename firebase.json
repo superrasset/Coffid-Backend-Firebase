@@ -108,6 +108,22 @@
       {
         "source": "/api/token",
         "function": "getToken"
+      },
+      {
+        "source": "/api/vp/init",
+        "function": "initVP"
+      },
+      {
+        "source": "/api/vp/verify",
+        "function": "verifyVP"
+      },
+      {
+        "source": "/api/vp/req/**",
+        "function": "getVPRequestObject"
+      },
+      {
+        "source": "/api/vp/response/**",
+        "function": "handleVPResponse"
       }
     ]
   }
