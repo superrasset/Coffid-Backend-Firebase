@@ -1,5 +1,9 @@
 // The Firebase Admin SDK to access Firestore.
 const {initializeApp} = require("firebase-admin/app");
+const {setGlobalOptions} = require("firebase-functions/v2");
+
+// Set default region to Europe (co-located with Firestore eur3)
+setGlobalOptions({ region: "europe-west1" });
 
 // Initialize Firebase Admin
 initializeApp();

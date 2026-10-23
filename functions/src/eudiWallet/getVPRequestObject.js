@@ -14,15 +14,20 @@ const verifierPrivateKey = defineSecret('COFFID_VERIFIER_PRIVATE_KEY')
 const verifierCert = defineSecret('COFFID_VERIFIER_CERT')
 const encryptionPubKeyJwk = defineSecret('COFFID_ENCRYPTION_PUBLIC_KEY_JWK')
 
-const { resolveEudiThreshold } = require('./eudiMapping')
+const { resolvePidAttributes } = require('./eudiMapping')
 
-function buildDcqlQuery(threshold) {
+const PID_DOCTYPE = 'eu.europa.ec.eudi.pid.1'
+
+function buildDcqlQuery(pidAttributes) {
   return {
     credentials: [{
-      id: threshold,
+      id: 'credential',
       format: 'mso_mdoc',
-      meta: { doctype_value: 'eu.europa.ec.av.1' },
-      claims: [{ path: ['eu.europa.ec.av.1', threshold], intent_to_retain: true }],
+      meta: { doctype_value: PID_DOCTYPE },
+      claims: pidAttributes.map(attr => ({
+        path: [PID_DOCTYPE, attr],
+        intent_to_retain: false,
+      })),
       multiple: false,
       require_cryptographic_holder_binding: true,
     }],
@@ -54,7 +59,7 @@ const getVPRequestObject = onRequest(
     const taskId = req.path.split('/').filter(Boolean).pop()
     if (!taskId) return res.status(400).json({ error: 'Missing taskId in path' })
 
-    console.log(`📋 getVPRequestObject — taskId: ${taskId}`)
+    console.log(`📋 getVPRequestObject — taskId: ${taskId}, body: ${JSON.stringify(req.body)}, contentType: ${req.headers['content-type']}`)
 
     try {
       const db = getFirestore()
@@ -71,8 +76,8 @@ const getVPRequestObject = onRequest(
         return res.status(409).json({ error: 'Task already processed' })
       }
 
-      const threshold = resolveEudiThreshold(taskData.infoRequired)
-      if (!threshold) {
+      const pidAttributes = resolvePidAttributes(taskData.infoRequired)
+      if (!pidAttributes) {
         console.error(`❌ Task not eligible for EU Wallet: ${taskId}`)
         return res.status(400).json({ error: 'Task not eligible for EU Wallet verification' })
       }
@@ -84,7 +89,7 @@ const getVPRequestObject = onRequest(
       await db.collection('pendingRequest').doc(taskId).update({
         vpNonce: nonce,
         vpState: state,
-        vpThreshold: threshold,
+        vpPidAttributes: pidAttributes,
         vpInitiatedAt: new Date(),
       })
 
@@ -95,44 +100,59 @@ const getVPRequestObject = onRequest(
         return res.status(500).json({ error: 'Verifier credentials not configured' })
       }
 
-      // x5c : certificat DER en base64 (sans headers PEM)
-      const certDer = certPem
-        .replace(/-----BEGIN CERTIFICATE-----/g, '')
-        .replace(/-----END CERTIFICATE-----/g, '')
-        .replace(/\s/g, '')
+      // x5c : chaîne de certs DER en base64. COFFID_VERIFIER_CERT peut contenir
+      // plusieurs certs PEM concaténés (leaf + CA) — on les extrait tous.
+      const x5c = [...certPem.matchAll(/-----BEGIN CERTIFICATE-----([\s\S]*?)-----END CERTIFICATE-----/g)]
+        .map(m => m[1].replace(/\s/g, ''))
 
       const encPubKeyJwk = JSON.parse(encryptionPubKeyJwk.value() || '{}')
 
       const apiBase = process.env.COFFID_API_BASE_URL || 'https://api.coffid.com'
-      const fiAud = process.env.FRANCE_IDENTITE_AUD || 'https://api.playground.france-identite.gouv.fr'
+      // aud = https://self-issued.me/v2 per OID4VP spec (confirmed by playground reference JWT)
+      const fiAud = 'https://self-issued.me/v2'
       const clientId = 'x509_san_dns:api.coffid.com'
 
       const { SignJWT, importPKCS8 } = await jose()
       const privateKey = await importPKCS8(privateKeyPem, 'ES256')
 
-      const jwt = await new SignJWT({
+      // OID4VP spec : si le wallet envoie wallet_nonce, il DOIT être retourné dans le JWT
+      const walletNonce = req.body?.wallet_nonce || null
+
+      const jwtPayload = {
         response_type: 'vp_token',
         response_mode: 'direct_post.jwt',
-        response_uri: `${apiBase}/api/vp/response/${taskId}`,
+        response_uri: process.env.RESPONSE_URI_OVERRIDE || `${apiBase}/api/vp/response/${taskId}`,
         client_id: clientId,
         nonce,
         state,
+      }
+      if (walletNonce) jwtPayload.wallet_nonce = walletNonce
+
+      const jwt = await new SignJWT({
+        ...jwtPayload,
         client_metadata: {
+          jwks: { keys: [encPubKeyJwk] },
+          encrypted_response_enc_values_supported: ['A128GCM', 'A256GCM'],
           authorization_encrypted_response_alg: 'ECDH-ES',
           authorization_encrypted_response_enc: 'A256GCM',
-          jwks: { keys: [encPubKeyJwk] },
-          vp_formats_supported: { mso_mdoc: {} },
+          vp_formats_supported: {
+            mso_mdoc: {
+              issuerauth_alg_values: [-7, -35, -36, -9],
+              deviceauth_alg_values: [-7, -35, -36, -9],
+            },
+          },
         },
-        dcql_query: buildDcqlQuery(threshold),
+        dcql_query: buildDcqlQuery(pidAttributes),
       })
-        .setProtectedHeader({ alg: 'ES256', x5c: [certDer] })
+        // typ: 'oauth-authz-req+jwt' required by OID4VP spec (confirmed by playground reference)
+        .setProtectedHeader({ alg: 'ES256', typ: 'oauth-authz-req+jwt', x5c })
         .setIssuer(clientId)
         .setAudience(fiAud)
         .setIssuedAt()
         .setExpirationTime('5m')
         .sign(privateKey)
 
-      console.log(`✅ Request Object JWT généré — taskId: ${taskId}, threshold: ${threshold}`)
+      console.log(`✅ Request Object JWT généré — taskId: ${taskId}, attrs: ${pidAttributes.join(',')}`)
 
       res.set('Content-Type', 'application/oauth-authz-req+jwt')
       return res.status(200).send(jwt)

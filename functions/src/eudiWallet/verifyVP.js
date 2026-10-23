@@ -3,6 +3,9 @@ const { getFirestore } = require('firebase-admin/firestore')
 const { encode: cborEncode, decode: cborDecode } = require('cbor-x')
 const crypto = require('node:crypto')
 const { verifyMdoc } = require('./mdocVerifier')
+const { buildResult } = require('./eudiMapping')
+
+const PID_DOCTYPE = 'eu.europa.ec.eudi.pid.1'
 
 // Origines autorisées — whitelist côté backend, l'origin est incluse dans le SessionTranscript
 // donc une origin forgée invaliderait le déchiffrement HPKE
@@ -60,7 +63,7 @@ const verifyVP = onRequest({ cors: true }, async (req, res) => {
     const taskData = taskSnap.data()
     if (taskData.status !== 'pending') return res.status(409).json({ error: 'Task already processed' })
 
-    const { vpNonce, hpkePrivKey, hpkeEncryptionInfo, vpThreshold } = taskData
+    const { vpNonce, hpkePrivKey, hpkeEncryptionInfo } = taskData
     if (!vpNonce || !hpkePrivKey || !hpkeEncryptionInfo) {
       return res.status(400).json({ error: 'VP flow not initiated — call /api/vp/init first' })
     }
@@ -103,11 +106,9 @@ const verifyVP = onRequest({ cors: true }, async (req, res) => {
       return res.status(400).json({ error: 'Decryption failed — invalid or tampered response' })
     }
 
-    // Vérification mDoc : chaîne IACA + valueDigests + holder binding + extraction claim
-    // info = CBOR(SessionTranscript) — utilisé à la fois pour HPKE et pour DeviceAuthentication
-    const { verified, ageVerified } = await verifyMdoc(deviceResponseBytes, vpThreshold, info)
+    const { verified, attributes } = await verifyMdoc(deviceResponseBytes, PID_DOCTYPE, info)
 
-    if (!verified || !ageVerified) {
+    if (!verified || !attributes) {
       console.error(`❌ verifyVP — mDoc verification failed — taskId: ${taskId}`)
       await db.collection('pendingRequest').doc(taskId).update({
         status: 'failed',
@@ -115,27 +116,19 @@ const verifyVP = onRequest({ cors: true }, async (req, res) => {
         vpNonce: null,
         failedAt: new Date(),
       })
-      return res.status(400).json({ error: 'Age verification failed' })
+      return res.status(400).json({ error: 'PID verification failed' })
     }
 
-    const result = {
-      ageVerified: true,
-      age: null,
-      ageOver18: true, // age_over_21 implique age_over_18
-      ...(vpThreshold === 'age_over_21' ? { ageOver21: true } : {}),
-      verificationMethod: 'france_identite',
-    }
+    const result = buildResult(attributes, taskData.infoRequired || [])
 
     await db.collection('pendingRequest').doc(taskId).update({
       status: 'completed',
-      verificationMethod: 'france_identite',
-      ageVerified: true,
       result,
-      vpNonce: null, // nonce consommé — empêche le rejeu
+      vpNonce: null,
       completedAt: new Date(),
     })
 
-    console.log(`✅ verifyVP — taskId: ${taskId}, threshold: ${vpThreshold}`)
+    console.log(`✅ verifyVP — taskId: ${taskId}, attrs: ${Object.keys(attributes).join(',')}`)
     return res.status(200).json({ ok: true })
 
   } catch (err) {

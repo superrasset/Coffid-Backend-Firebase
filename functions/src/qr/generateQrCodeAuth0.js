@@ -73,6 +73,8 @@ async function logApiUsage(stripeCustomerId, clientId, endpoint, requests = 1, m
   }
 }
 
+const DEFAULT_WEB_VERSION = 'v1';
+
 /**
  * Function to generate a QR code based on text passed as a query parameter
  * Creates a pending request in Firestore and returns QR code data
@@ -147,6 +149,13 @@ const generateQrCode = onRequest({ cors: true }, async (req, res) => {
             return res.status(400).json({ error: 'Invalid redirect_error: must be a valid https URL.' });
         }
 
+        // Validate optional web app version
+        const webVersion = body.web_version || null;
+        if (webVersion && !/^v\d+$/.test(webVersion)) {
+            return res.status(400).json({ error: 'Invalid web_version: must be in the format "v1", "v2", etc.' });
+        }
+        const effectiveVersion = webVersion || DEFAULT_WEB_VERSION;
+
         console.log('Processing request for info:', infoRequired);
 
         // Extraire les informations depuis authContext (Auth0 ou API Key)
@@ -189,6 +198,7 @@ const generateQrCode = onRequest({ cors: true }, async (req, res) => {
           infoRequired: infoRequired,
           redirectSuccess: redirectSuccess,
           redirectError: redirectError,
+          webVersion: effectiveVersion,
           status: 'pending',
           createdAt: new Date(),
           result: null,
@@ -197,7 +207,7 @@ const generateQrCode = onRequest({ cors: true }, async (req, res) => {
         });
 
         // Generate QR code URL (deep link, text format)
-        const qrCodeText = 'https://api.coffid.com/identity-check/' + pendingRequest.id;
+        const qrCodeText = `https://coff.id/${effectiveVersion}/identity-check/${pendingRequest.id}`;
         
         // Log l'usage de l'API de manière asynchrone et non-bloquante
         if (customer_id && client_id) {
@@ -222,6 +232,7 @@ const generateQrCode = onRequest({ cors: true }, async (req, res) => {
             deep_link: qrCodeText,
             task_id: pendingRequest.id,
             infoRequired: infoRequired,
+            web_version: effectiveVersion,
             ...(redirectSuccess && { redirect_success: redirectSuccess }),
             ...(redirectError   && { redirect_error:   redirectError }),
         });

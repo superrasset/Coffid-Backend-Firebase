@@ -1,21 +1,10 @@
 const { onRequest } = require('firebase-functions/v2/https')
 const { getFirestore } = require('firebase-admin/firestore')
-const { encode: cborEncode, addExtension } = require('cbor-x')
+const { encode: cborEncode, Tag: CborTag } = require('cbor-x')
 const crypto = require('node:crypto')
 
-// CBOR tag 24 = "embedded CBOR" (bstr containing CBOR bytes) — ISO 18013-5 DeviceRequest
-class EmbeddedCbor {
-  constructor(bytes) { this.bytes = bytes }
-}
-addExtension({
-  Class: EmbeddedCbor,
-  tag: 24,
-  encode(instance, encodeItem) { encodeItem(instance.bytes) },
-  decode(data)                 { return data },
-})
-
 const { getHpkeSuite } = require('./hpkeUtils')
-const { resolveEudiThreshold } = require('./eudiMapping')
+const { resolvePidAttributes } = require('./eudiMapping')
 
 /**
  * POST /api/vp/init?taskId=xxx
@@ -37,8 +26,8 @@ const initVP = onRequest({ cors: true }, async (req, res) => {
     const taskData = taskSnap.data()
     if (taskData.status !== 'pending') return res.status(409).json({ error: 'Task already processed' })
 
-    const threshold = resolveEudiThreshold(taskData.infoRequired)
-    if (!threshold) return res.status(400).json({ error: 'Task not eligible for EU Wallet verification' })
+    const pidAttributes = resolvePidAttributes(taskData.infoRequired)
+    if (!pidAttributes) return res.status(400).json({ error: 'Task not eligible for EU Wallet verification' })
 
     // Paire de clés HPKE éphémère — une par transaction, jamais réutilisée
     const suite = await getHpkeSuite()
@@ -49,14 +38,16 @@ const initVP = onRequest({ cors: true }, async (req, res) => {
     const nonce = crypto.randomBytes(32).toString('base64url')
 
     // DeviceRequest CBOR (ISO 18013-5)
-    // itemsRequest = CBOR tag 24 (bstr .cbor — embedded CBOR)
+    const pidDocType = 'eu.europa.ec.eudi.pid.1'
+    const nameSpaceEntries = {}
+    for (const attr of pidAttributes) nameSpaceEntries[attr] = false // intent_to_retain = false
     const itemsRequestInner = cborEncode({
-      docType: 'eu.europa.ec.av.1',
-      nameSpaces: { 'eu.europa.ec.av.1': { [threshold]: false } }, // intent_to_retain = false
+      docType: pidDocType,
+      nameSpaces: { [pidDocType]: nameSpaceEntries },
     })
     const deviceRequestCbor = cborEncode({
       version: '1.0',
-      docRequests: [{ itemsRequest: new EmbeddedCbor(itemsRequestInner) }],
+      docRequests: [{ itemsRequest: new CborTag(itemsRequestInner, 24) }],
     })
 
     // encryptionInfo CBOR (ISO 18013-7 Annex C)
@@ -70,13 +61,13 @@ const initVP = onRequest({ cors: true }, async (req, res) => {
 
     await db.collection('pendingRequest').doc(taskId).update({
       vpNonce:            nonce,
-      vpThreshold:        threshold,
+      vpPidAttributes:    pidAttributes,
       hpkePrivKey:        privKeyB64,
       hpkeEncryptionInfo: encryptionInfoB64,
       vpInitiatedAt:      new Date(),
     })
 
-    console.log(`✅ initVP — taskId: ${taskId}, threshold: ${threshold}`)
+    console.log(`✅ initVP — taskId: ${taskId}, attrs: ${pidAttributes.join(',')}`)
     return res.status(200).json({ deviceRequest: deviceRequestB64, encryptionInfo: encryptionInfoB64 })
 
   } catch (err) {
