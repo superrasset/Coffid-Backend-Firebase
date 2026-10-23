@@ -1,3 +1,5 @@
 node_modules/
 *.local
 keys/
+.env*
+!.env.coffid-2388b
