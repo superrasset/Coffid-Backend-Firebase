@@ -8,6 +8,8 @@
  * n'est pas affiché et l'utilisateur passe par le scan OCR.
  */
 
+const { buildResult: buildNormalizedResult } = require('../utils/resultBuilder')
+
 // infoRequired (Coffid B2B) → element identifier PID eu.europa.ec.eudi.pid.1
 // Les booléens d'âge (age_over_18, majority, age_over_21) et age sont tous résolus
 // depuis birth_date — plus fiable que les attributs booléens absents de certains credentials.
@@ -37,8 +39,16 @@ function resolvePidAttributes(infoRequired = []) {
   const pidAttrs = new Set()
   for (const key of infoRequired) {
     const attr = INFOREQ_TO_PID_ELEMENT[key]
-    if (!attr) return null  // champ non satisfaisable via PID → OCR requis
-    pidAttrs.add(attr)
+    if (attr) {
+      pidAttrs.add(attr)
+      continue
+    }
+    // age_over_N dynamique (N quelconque) → birth_date suffit
+    if (/^age_over_\d+$/.test(key)) {
+      pidAttrs.add('birth_date')
+      continue
+    }
+    return null  // champ non satisfaisable via PID → OCR requis
   }
 
   return [...pidAttrs]
@@ -54,14 +64,6 @@ function isEudiEligible(infoRequired = []) {
   return resolvePidAttributes(infoRequired) !== null
 }
 
-/**
- * Calcule les champs dérivés à partir des attributs PID extraits.
- * Les booléens d'âge et age sont tous calculés depuis birth_date.
- *
- * @param {object} pidAttributes  Attributs bruts extraits du PID
- * @param {string[]} infoRequired Liste des champs demandés par le client B2B
- * @returns {object}  Résultat final à écrire dans Firestore
- */
 // cbor-x decodes CBOR tagged values as { tag: <number>, value: <inner> }
 // (e.g. tag 1004 = full-date string). Unwrap to plain JS value.
 function resolveAttr(val) {
@@ -71,65 +73,23 @@ function resolveAttr(val) {
   return val
 }
 
+/**
+ * Normalise les attributs PID bruts vers la shape commune, puis délègue
+ * à resultBuilder pour produire un result identique au chemin OCR.
+ *
+ * @param {object} pidAttributes  Attributs bruts extraits du PID
+ * @param {string[]} infoRequired Liste des champs demandés par le client B2B
+ * @returns {object}
+ */
 function buildResult(pidAttributes, infoRequired) {
-  const result = {
-    verificationMethod: 'france_identite',
+  const data = {
+    firstname:   pidAttributes.given_name  !== undefined ? resolveAttr(pidAttributes.given_name)  : null,
+    lastname:    pidAttributes.family_name !== undefined ? resolveAttr(pidAttributes.family_name) : null,
+    birthDate:   pidAttributes.birth_date  !== undefined ? resolveAttr(pidAttributes.birth_date)  : null,
+    nationality: pidAttributes.nationality !== undefined ? resolveAttr(pidAttributes.nationality) : null,
+    sex:         pidAttributes.gender      !== undefined ? resolveAttr(pidAttributes.gender)      : null,
   }
-
-  for (const key of infoRequired) {
-    switch (key) {
-      case 'firstname':
-        if (pidAttributes.given_name !== undefined)
-          result.firstname = resolveAttr(pidAttributes.given_name)
-        break
-      case 'lastname':
-        if (pidAttributes.family_name !== undefined)
-          result.lastname = resolveAttr(pidAttributes.family_name)
-        break
-      case 'birthdate':
-        if (pidAttributes.birth_date !== undefined)
-          result.birthdate = resolveAttr(pidAttributes.birth_date)
-        break
-      case 'nationality':
-        if (pidAttributes.nationality !== undefined)
-          result.nationality = resolveAttr(pidAttributes.nationality)
-        break
-      case 'sex':
-      case 'gender':
-        if (pidAttributes.gender !== undefined)
-          result.gender = resolveAttr(pidAttributes.gender)
-        break
-      case 'age':
-        if (pidAttributes.birth_date) {
-          result.age = computeAge(resolveAttr(pidAttributes.birth_date))
-        }
-        break
-      case 'age_over_18':
-      case 'majority':
-        if (pidAttributes.birth_date) {
-          result.ageOver18 = computeAge(resolveAttr(pidAttributes.birth_date)) >= 18
-          result.ageVerified = result.ageOver18
-        }
-        break
-      case 'age_over_21':
-        if (pidAttributes.birth_date) {
-          result.ageOver21 = computeAge(resolveAttr(pidAttributes.birth_date)) >= 21
-          result.ageVerified = result.ageOver21
-        }
-        break
-    }
-  }
-
-  return result
-}
-
-function computeAge(birthDateStr) {
-  const birth = new Date(birthDateStr)
-  const now = new Date()
-  let age = now.getFullYear() - birth.getFullYear()
-  const m = now.getMonth() - birth.getMonth()
-  if (m < 0 || (m === 0 && now.getDate() < birth.getDate())) age--
-  return age
+  return buildNormalizedResult(infoRequired, data, 'france_identite')
 }
 
 module.exports = {

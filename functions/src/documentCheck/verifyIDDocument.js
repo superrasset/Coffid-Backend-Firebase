@@ -3,6 +3,7 @@
 const {getFirestore} = require("firebase-admin/firestore");
 const {info: logInfo, error: logError} = require("firebase-functions/logger");
 const {createOCRService} = require("./ocrServiceV2");
+const { buildResult } = require('../utils/resultBuilder');
 
 /**
  * Process ID document verification workflow
@@ -492,48 +493,14 @@ async function updatePendingRequestFromVerifiedDocument(taskId, verifiedDocData,
       infoRequired,
     });
 
-    const result = { verificationMethod: 'ocr' };
-
-    const computeAge = (birthDateStr) => {
-      if (!birthDateStr) return null;
-      const birth = new Date(birthDateStr);
-      if (isNaN(birth.getTime())) return null;
-      const now = new Date();
-      return now.getFullYear() - birth.getFullYear()
-        - (now < new Date(now.getFullYear(), birth.getMonth(), birth.getDate()) ? 1 : 0);
+    const data = {
+      firstname:   verifiedDocData.firstname   || null,
+      lastname:    verifiedDocData.lastname    || null,
+      birthDate:   verifiedDocData.birthDate   || null,
+      nationality: verifiedDocData.nationality || null,
+      sex:         verifiedDocData.sex         || null,
     };
-    const isAgeOver = (birthDateStr, minAge) => {
-      const age = computeAge(birthDateStr);
-      return age !== null ? age >= minAge : null;
-    };
-
-    for (const field of infoRequired) {
-      if (field === 'firstname' && verifiedDocData.firstname) {
-        result.firstname = verifiedDocData.firstname;
-      } else if (field === 'lastname' && verifiedDocData.lastname) {
-        result.lastname = verifiedDocData.lastname;
-      } else if (field === 'birthdate' && verifiedDocData.birthDate) {
-        result.birthDate = verifiedDocData.birthDate;
-      } else if (field === 'age' && verifiedDocData.birthDate) {
-        const computedAge = computeAge(verifiedDocData.birthDate);
-        if (computedAge !== null) result.age = computedAge;
-      } else if (field === 'nationality' && verifiedDocData.nationality) {
-        result.nationality = verifiedDocData.nationality;
-      } else if ((field === 'sex' || field === 'gender') && verifiedDocData.sex) {
-        result.sex = verifiedDocData.sex;
-      } else if (field === 'majority') {
-        const over18 = isAgeOver(verifiedDocData.birthDate, 18);
-        if (over18 !== null) result.majority = over18;
-      } else {
-        const ageOverMatch = field.match(/^age_over_(\d+)$/);
-        if (ageOverMatch) {
-          const minAge = parseInt(ageOverMatch[1], 10);
-          const isOver = isAgeOver(verifiedDocData.birthDate, minAge);
-          if (isOver !== null) result[field] = isOver;
-        }
-      }
-    }
-
+    const result = buildResult(infoRequired, data, 'ocr');
     if (verifiedDocData.documentType) result.documentType = verifiedDocData.documentType;
 
     await db.collection('pendingRequest').doc(taskId).update({
