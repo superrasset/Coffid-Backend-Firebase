@@ -173,20 +173,18 @@ function verifyValueDigests(items, nameSpace, mso) {
   const nsDigests = mso?.valueDigests?.[nameSpace]
   if (!nsDigests) { console.error(`❌ MSO: valueDigests absent pour ${nameSpace}`); return { ok: false, debug: { reason: 'no_nsDigests' } } }
 
-  const firstItemDebug = {}
-
   for (const encodedItem of items) {
-    const { innerBytes, tag24Bytes, method } = unwrapTag24(encodedItem)
+    const { innerBytes, tag24Bytes } = unwrapTag24(encodedItem)
     let item
     try { item = cborDecode(innerBytes) } catch {
       console.error('❌ valueDigests: impossible de décoder un IssuerSignedItem')
-      return { ok: false, debug: { reason: 'decode_failed' } }
+      return { ok: false }
     }
 
     const digestID = item?.digestID
     if (digestID === undefined || digestID === null) {
       console.error('❌ valueDigests: digestID absent')
-      return { ok: false, debug: { reason: 'no_digestID' } }
+      return { ok: false }
     }
 
     // Accès avec clé numérique ET string (cbor-x peut retourner Map ou objet)
@@ -195,39 +193,16 @@ function verifyValueDigests(items, nameSpace, mso) {
     if (!expectedDigest && nsDigests instanceof Map) expectedDigest = nsDigests.get(String(digestID))
     if (!expectedDigest) expectedDigest = nsDigests[String(digestID)]
 
-    // Log de diagnostic sur le premier item
-    if (!firstItemDebug.done) {
-      firstItemDebug.done = true
-      firstItemDebug.digestID = digestID
-      firstItemDebug.elementIdentifier = item?.elementIdentifier
-      firstItemDebug.unwrapMethod = method
-      firstItemDebug.encodedItemType = typeof encodedItem
-      firstItemDebug.encodedItemIsBuffer = Buffer.isBuffer(encodedItem)
-      firstItemDebug.encodedItemIsUint8 = encodedItem instanceof Uint8Array
-      firstItemDebug.innerBytesLen = innerBytes.length
-      firstItemDebug.tag24BytesHex = tag24Bytes.toString('hex').substring(0, 80)
-      firstItemDebug.nsDigestsType = nsDigests instanceof Map ? 'Map' : typeof nsDigests
-      firstItemDebug.nsDigestsKeys = nsDigests instanceof Map
-        ? [...nsDigests.keys()].slice(0, 5).map(String)
-        : Object.keys(nsDigests).slice(0, 5)
-      firstItemDebug.expectedDigestFound = !!expectedDigest
-      if (expectedDigest) {
-        const expBuf = Buffer.isBuffer(expectedDigest) ? expectedDigest : Buffer.from(expectedDigest)
-        firstItemDebug.expectedDigestHex = expBuf.toString('hex')
-        firstItemDebug.actualDigestHex = crypto.createHash(nodeHashAlg).update(tag24Bytes).digest('hex')
-      }
-    }
-
-    if (!expectedDigest) { console.error(`❌ valueDigests: digestID ${digestID} absent du MSO`); return { ok: false, debug: firstItemDebug } }
+    if (!expectedDigest) { console.error(`❌ valueDigests: digestID ${digestID} absent du MSO`); return { ok: false } }
 
     const actualDigest = crypto.createHash(nodeHashAlg).update(tag24Bytes).digest()
     const expectedBuf = Buffer.isBuffer(expectedDigest) ? expectedDigest : Buffer.from(expectedDigest)
     if (!crypto.timingSafeEqual(actualDigest, expectedBuf)) {
       console.error(`❌ valueDigests: digest incorrect pour ${item.elementIdentifier}`)
-      return { ok: false, debug: firstItemDebug }
+      return { ok: false }
     }
   }
-  return { ok: true, debug: firstItemDebug }
+  return { ok: true }
 }
 
 function extractDevicePublicKey(mso) {
@@ -323,8 +298,6 @@ async function verifyMdoc(deviceResponseBuffer, docType, sessionTranscriptBytes 
       console.error('❌ mDoc: impossible d\'extraire le MSO')
       return { verified: false, attributes: null, reason: 'mso_extract_failed' }
     }
-    console.log(`📋 MSO keys: ${Object.keys(mso).join(',')} | digestAlg: ${mso.digestAlgorithm}`)
-
     const nameSpace = docType
     const nsItems = issuerSigned?.nameSpaces?.[nameSpace]
     if (!nsItems || !Array.isArray(nsItems)) {
@@ -335,8 +308,8 @@ async function verifyMdoc(deviceResponseBuffer, docType, sessionTranscriptBytes 
     // 3. Vérification valueDigests
     const digestResult = verifyValueDigests(nsItems, nameSpace, mso)
     if (!digestResult.ok) {
-      console.error('❌ mDoc: échec vérification valueDigests:', JSON.stringify(digestResult.debug))
-      return { verified: false, attributes: null, reason: 'digest_mismatch', debugInfo: digestResult.debug }
+      console.error('❌ mDoc: échec vérification valueDigests')
+      return { verified: false, attributes: null, reason: 'digest_mismatch' }
     }
 
     // 4. Holder binding (DC API uniquement)

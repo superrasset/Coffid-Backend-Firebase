@@ -59,7 +59,7 @@ const getVPRequestObject = onRequest(
     const taskId = req.path.split('/').filter(Boolean).pop()
     if (!taskId) return res.status(400).json({ error: 'Missing taskId in path' })
 
-    console.log(`📋 getVPRequestObject — taskId: ${taskId}, body: ${JSON.stringify(req.body)}, contentType: ${req.headers['content-type']}`)
+    console.log(`📋 getVPRequestObject — taskId: ${taskId}`)
 
     try {
       const db = getFirestore()

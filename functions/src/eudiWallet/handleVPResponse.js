@@ -37,20 +37,7 @@ const handleVPResponse = onRequest({ cors: true, secrets: [encryptionPrivateKey]
   const taskId = req.path.split('/').filter(Boolean).pop()
   if (!taskId) return res.status(400).json({ error: 'Missing taskId in path' })
 
-  console.log(`📋 handleVPResponse — taskId: ${taskId} | contentType: ${req.headers['content-type']} | bodyKeys: ${Object.keys(req.body || {}).join(',')} | bodyType: ${typeof req.body}`)
-
   const db = getFirestore()
-  // DEBUG — sauvegarde le body brut pour analyse locale
-  try {
-    await db.collection('_vpDebug').doc(taskId).set({
-      taskId,
-      contentType: req.headers['content-type'],
-      bodyKeys: Object.keys(req.body || {}),
-      response: req.body?.response ?? null,
-      state: req.body?.state ?? null,
-      ts: new Date(),
-    }, { merge: true })
-  } catch (e) { console.warn('debug write failed:', e.message) }
 
   try {
     const taskSnap = await db.collection('pendingRequest').doc(taskId).get()
@@ -88,18 +75,6 @@ const handleVPResponse = onRequest({ cors: true, secrets: [encryptionPrivateKey]
       const encPrivKey = await importPKCS8(encPrivKeyPem, 'ECDH-ES')
       const { plaintext } = await compactDecrypt(jwe, encPrivKey)
       decryptedPayload = JSON.parse(new TextDecoder().decode(plaintext))
-      // DEBUG — sauvegarde le payload décrypté
-      try {
-        const vpT = decryptedPayload.vp_token
-        await db.collection('_vpDebug').doc(taskId).set({
-          decryptedKeys: Object.keys(decryptedPayload),
-          vpTokenType: typeof vpT,
-          vpTokenIsArray: Array.isArray(vpT),
-          vpTokenKeys: vpT && typeof vpT === 'object' ? Object.keys(vpT) : null,
-          vpTokenPreview: JSON.stringify(vpT)?.substring(0, 500) ?? null,
-          stateInPayload: decryptedPayload.state ?? null,
-        }, { merge: true })
-      } catch (e) { /* ignore */ }
     } catch (e) {
       console.error('❌ JWE decryption failed:', e.message)
       return res.status(400).json({ error: 'Invalid or tampered response' })
@@ -117,7 +92,6 @@ const handleVPResponse = onRequest({ cors: true, secrets: [encryptionPrivateKey]
     // OID4VP 1.0 avec DCQL : vp_token est un objet { <credentialId>: "<base64url CBOR>" }
     // Avec Presentation Exchange ou réponse non-DCQL : vp_token est une chaîne base64url
     const vpTokenRaw = decryptedPayload.vp_token
-    console.log(`📋 vp_token type: ${typeof vpTokenRaw} | isArray: ${Array.isArray(vpTokenRaw)} | keys: ${vpTokenRaw && typeof vpTokenRaw === 'object' ? Object.keys(vpTokenRaw).join(',') : 'N/A'} | preview: ${JSON.stringify(vpTokenRaw)?.substring(0, 100)}`)
 
     // OID4VP 1.0 DCQL : vp_token est { <credentialId>: "<base64url CBOR>" }
     // Fallback : base64url string directe (PE / non-DCQL)
@@ -127,7 +101,6 @@ const handleVPResponse = onRequest({ cors: true, secrets: [encryptionPrivateKey]
       let val = vpTokenRaw['credential'] ?? Object.values(vpTokenRaw)[0] ?? null
       if (Array.isArray(val)) val = val[0] ?? null
       rawVpToken = val
-      console.log(`📋 vp_token extrait du DCQL map → type: ${typeof rawVpToken} | preview: ${String(rawVpToken)?.substring(0, 80)}`)
     } else {
       rawVpToken = vpTokenRaw
     }
@@ -138,31 +111,14 @@ const handleVPResponse = onRequest({ cors: true, secrets: [encryptionPrivateKey]
     }
 
     const deviceResponseBuffer = Buffer.from(rawVpToken, 'base64url')
-    console.log(`📋 deviceResponseBuffer length: ${deviceResponseBuffer.length}`)
 
-    // DEBUG — sauvegarder le token brut complet pour diagnostic local
+    let verified, attributes
     try {
-      await db.collection('_vpDebug').doc(taskId).set({
-        rawVpToken: rawVpToken,
-        deviceResponseLength: deviceResponseBuffer.length,
-      }, { merge: true })
-    } catch (e) { console.warn('debug rawVpToken write failed:', e.message) }
-
-    let verified, attributes, reason, debugInfo
-    try {
-      ;({ verified, attributes, reason, debugInfo } = await verifyMdoc(deviceResponseBuffer, PID_DOCTYPE, null))
+      ;({ verified, attributes } = await verifyMdoc(deviceResponseBuffer, PID_DOCTYPE, null))
     } catch (mdocErr) {
       console.error('❌ verifyMdoc threw:', mdocErr.message)
-      await db.collection('_vpDebug').doc(taskId).set({ mdocError: mdocErr.message }, { merge: true })
       return res.status(400).json({ error: 'PID verification error' })
     }
-
-    await db.collection('_vpDebug').doc(taskId).set({
-      mdocVerified: verified,
-      mdocAttrs: attributes ? Object.keys(attributes) : null,
-      mdocReason: reason ?? null,
-      mdocDebug: debugInfo ?? null,
-    }, { merge: true })
 
     if (!verified || !attributes) {
       console.error(`❌ Vérification mDoc échouée — taskId: ${taskId}`)
