@@ -81,6 +81,17 @@ const DEFAULT_WEB_VERSION = 'v1';
  * Protected with unified authentication (Auth0 JWT OR API Key)
  */
 const generateQrCode = onRequest({ cors: true }, async (req, res) => {
+    // Respond to CORS preflight before auth — browsers send OPTIONS before any
+    // cross-origin request with custom headers (x-api-key). Without this, the
+    // auth middleware returns 401 on the preflight and the browser blocks the real request.
+    if (req.method === 'OPTIONS') {
+        res.set('Access-Control-Allow-Origin', '*');
+        res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
+        res.set('Access-Control-Allow-Headers', 'Content-Type, X-API-Key');
+        res.set('Access-Control-Max-Age', '86400');
+        return res.status(204).send('');
+    }
+
     // Apply unified authentication middleware
     try {
         await authenticateRequest(req, res);
@@ -108,6 +119,8 @@ const generateQrCode = onRequest({ cors: true }, async (req, res) => {
         const isValidHttpsUrl = (value) => {
             try { return new URL(value).protocol === 'https:'; } catch { return false; }
         };
+        const VALID_AI_MODELS = new Set(['gemini', 'mistral', 'openai', 'mindee']);
+        const VALID_VERIFICATION_METHODS = new Set(['wallet', 'ocr', 'any']);
 
         const body = req.body || {};
 
@@ -147,6 +160,22 @@ const generateQrCode = onRequest({ cors: true }, async (req, res) => {
         }
         if (redirectError && !isValidHttpsUrl(redirectError)) {
             return res.status(400).json({ error: 'Invalid redirect_error: must be a valid https URL.' });
+        }
+
+        // Validate optional ai_model
+        const aiModel = body.ai_model || null;
+        if (aiModel && !VALID_AI_MODELS.has(aiModel)) {
+            return res.status(400).json({
+                error: 'Invalid ai_model: must be one of ' + [...VALID_AI_MODELS].join(', '),
+            });
+        }
+
+        // Validate optional verification_method
+        const verificationMethod = body.verification_method || 'any';
+        if (!VALID_VERIFICATION_METHODS.has(verificationMethod)) {
+            return res.status(400).json({
+                error: 'Invalid verification_method: must be one of ' + [...VALID_VERIFICATION_METHODS].join(', '),
+            });
         }
 
         // Validate optional web app version
@@ -199,6 +228,8 @@ const generateQrCode = onRequest({ cors: true }, async (req, res) => {
           redirectSuccess: redirectSuccess,
           redirectError: redirectError,
           webVersion: effectiveVersion,
+          aiModel: aiModel,
+          verificationMethod: verificationMethod,
           status: 'pending',
           createdAt: new Date(),
           result: null,
@@ -233,6 +264,8 @@ const generateQrCode = onRequest({ cors: true }, async (req, res) => {
             task_id: pendingRequest.id,
             infoRequired: infoRequired,
             web_version: effectiveVersion,
+            verification_method: verificationMethod,
+            ...(aiModel        && { ai_model:         aiModel }),
             ...(redirectSuccess && { redirect_success: redirectSuccess }),
             ...(redirectError   && { redirect_error:   redirectError }),
         });
