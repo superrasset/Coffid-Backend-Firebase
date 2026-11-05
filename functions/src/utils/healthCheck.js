@@ -22,7 +22,7 @@ const healthCheck = onRequest(async (req, res) => {
                 firestore: testCollection ? "connected" : "disconnected",
                 functions: "running"
             },
-            version: "1.0.1-staging-ci-test"
+            version: "1.0.0"
         };
 
         res.status(200).json(healthData);
