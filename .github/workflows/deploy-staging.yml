@@ -1,11 +1,9 @@
 name: Deploy to Staging
 
 on:
-  push:
+  pull_request:
     branches:
-      - staging
-      - 'feat/**'
-      - 'fix/**'
+      - main
 
 jobs:
   deploy:
@@ -24,4 +22,4 @@ jobs:
         working-directory: functions
 
       - name: Deploy to Firebase Staging
-        run: npx firebase-tools deploy --only functions,hosting --project coffid-dev --token "${{ secrets.FIREBASE_TOKEN }}" --non-interactive
+        run: npx firebase-tools deploy --only functions,hosting --project coffid-dev --token "${{ secrets.FIREBASE_TOKEN }}" --non-interactive --force
