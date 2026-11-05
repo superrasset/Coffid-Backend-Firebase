@@ -1,11 +1,9 @@
 name: Deploy to Staging
 
 on:
-  push:
+  pull_request:
     branches:
-      - staging
-      - 'feat/**'
-      - 'fix/**'
+      - main
 
 jobs:
   deploy:
