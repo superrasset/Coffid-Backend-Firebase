@@ -248,12 +248,20 @@ function verifyDeviceSignature(deviceSigned, docType, sessionTranscriptBytes, de
 }
 
 // Clés IACA chargées au démarrage
+// FRANCE_IDENTITE_ENV=prod  → uniquement cert production (app France Identité réelle)
+// FRANCE_IDENTITE_ENV=sandbox → preprod + prod (app Partenaires acceptée — dev uniquement)
+// ⚠️  VIGILANCE : toujours laisser 'prod' en production pour rejeter les credentials de test
 const IACA_PUBLIC_KEYS = (() => {
+  const env = process.env.FRANCE_IDENTITE_ENV || 'prod'
+  const pems = env === 'sandbox'
+    ? [IACA_PID_PREPROD_PEM, IACA_PID_PROD_PEM]
+    : [IACA_PID_PROD_PEM]
   const keys = []
-  for (const pem of [IACA_PID_PREPROD_PEM, IACA_PID_PROD_PEM]) {
+  for (const pem of pems) {
     try { keys.push(new crypto.X509Certificate(pem).publicKey) }
     catch (e) { console.error('❌ Impossible de charger un certificat IACA:', e.message) }
   }
+  console.log(`🔐 IACA keys loaded — env: ${env}, count: ${keys.length}`)
   return keys
 })()
 
