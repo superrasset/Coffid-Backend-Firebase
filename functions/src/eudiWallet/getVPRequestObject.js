@@ -99,6 +99,11 @@ const getVPRequestObject = onRequest(
         console.error('❌ COFFID_VERIFIER_PRIVATE_KEY ou COFFID_VERIFIER_CERT manquant')
         return res.status(500).json({ error: 'Verifier credentials not configured' })
       }
+      // ⚠️  VIGILANCE — certificat verifier :
+      // Sandbox : self-signed accepté par France Identité (aucune whitelist côté FI pour OID4VP).
+      // Production : remplacer par un cert Let's Encrypt via DNS challenge sur api.coffid.com
+      //   → certbot certonly --manual --preferred-challenges dns -d api.coffid.com
+      //   → stocker fullchain.pem dans COFFID_VERIFIER_CERT, privkey.pem dans COFFID_VERIFIER_PRIVATE_KEY
 
       // x5c : chaîne de certs DER en base64. COFFID_VERIFIER_CERT peut contenir
       // plusieurs certs PEM concaténés (leaf + CA) — on les extrait tous.
@@ -108,8 +113,16 @@ const getVPRequestObject = onRequest(
       const encPubKeyJwk = JSON.parse(encryptionPubKeyJwk.value() || '{}')
 
       const apiBase = process.env.COFFID_API_BASE_URL || 'https://api.coffid.com'
-      // aud = https://self-issued.me/v2 per OID4VP spec (confirmed by playground reference JWT)
-      const fiAud = 'https://self-issued.me/v2'
+
+      // ⚠️  VIGILANCE — aud :
+      // Sandbox (Partenaires) : https://api.playground.france-identite.gouv.fr  ← doc EUDI Unfold
+      //   (les tests ont aussi passé avec https://self-issued.me/v2 — le sandbox semble tolérant)
+      // Production : valeur inconnue, probablement https://api.france-identite.gouv.fr
+      //   → À CONFIRMER avec anthony.carmoy@interieur.gouv.fr avant déploiement prod.
+      // Configurer FRANCE_IDENTITE_AUD en Firebase env :
+      //   sandbox → https://api.playground.france-identite.gouv.fr
+      //   prod    → à confirmer
+      const fiAud = process.env.FRANCE_IDENTITE_AUD || 'https://self-issued.me/v2'
       const clientId = 'x509_san_dns:api.coffid.com'
 
       const { SignJWT, importPKCS8 } = await jose()

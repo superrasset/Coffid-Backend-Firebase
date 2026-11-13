@@ -24,6 +24,11 @@ const INFOREQ_TO_PID_ELEMENT = {
   age_over_21: 'birth_date',
   sex:         'gender',
   gender:      'gender',
+  // ⚠️  VIGILANCE — portrait :
+  // Le PID contient une photo (CBOR bytes, format JPEG/PNG).
+  // France Identité demande un consentement explicite de l'utilisateur pour ce champ.
+  // Ne demander portrait que si le cas d'usage le justifie (RGPD Art. 5(1)(c) — minimisation).
+  portrait:    'portrait',
 }
 
 /**
@@ -88,6 +93,8 @@ function buildResult(pidAttributes, infoRequired) {
     birthDate:   pidAttributes.birth_date  !== undefined ? resolveAttr(pidAttributes.birth_date)  : null,
     nationality: pidAttributes.nationality !== undefined ? resolveAttr(pidAttributes.nationality) : null,
     sex:         pidAttributes.gender      !== undefined ? resolveAttr(pidAttributes.gender)      : null,
+    // portrait = Buffer de bytes (JPEG/PNG) — null si non demandé ou absent du credential
+    portrait:    pidAttributes.portrait    !== undefined ? resolveAttr(pidAttributes.portrait)    : null,
   }
   return buildNormalizedResult(infoRequired, data, 'france_identite')
 }
